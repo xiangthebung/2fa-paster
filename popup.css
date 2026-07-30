@@ -1,0 +1,505 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f4f3f8;
+  --surface: #ffffff;
+  --surface-muted: #eeedf4;
+  --surface-hover: #f8f7fb;
+  --separator: rgba(60, 60, 67, .14);
+  --text: #1d1d1f;
+  --secondary: #4a4a52;
+  --tertiary: #6a6a74;
+  --accent: #5b45e0;
+  --accent-press: #4a37c4;
+  --accent-text: #4a37c4;
+  --accent-soft: rgba(91, 69, 224, .10);
+  --success-text: #1b7a3a;
+  --success-soft: rgba(27, 122, 58, .10);
+  --danger: #d70015;
+  --danger-soft: rgba(215, 0, 21, .09);
+  --warn-text: #8a5300;
+  --warn-soft: rgba(180, 110, 0, .10);
+  --focus: rgba(91, 69, 224, .55);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, .05), 0 6px 16px rgba(0, 0, 0, .04);
+  --switch-off: #d6d6de;
+  --radius-card: 14px;
+  --radius-control: 11px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+}
+
+/*
+ * Dark mode is the same layout with the tokens swapped. The accent lightens
+ * rather than staying put: #5b45e0 on a dark surface reads as a hole in the
+ * screen, and a code is the one thing here that has to be legible instantly.
+ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1c1f;
+    --surface: #26262b;
+    --surface-muted: #32323a;
+    --surface-hover: #2e2e35;
+    --separator: rgba(235, 235, 245, .14);
+    --text: #f2f2f5;
+    --secondary: #c8c8d0;
+    --tertiary: #9a9aa5;
+    --accent: #6d5bff;
+    --accent-press: #5b45e0;
+    --accent-text: #b3a8ff;
+    --accent-soft: rgba(109, 91, 255, .18);
+    --success-text: #5fd18a;
+    --success-soft: rgba(95, 209, 138, .16);
+    --danger: #ff6961;
+    --danger-soft: rgba(255, 105, 97, .16);
+    --warn-text: #f0b849;
+    --warn-soft: rgba(240, 184, 73, .16);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 16px rgba(0, 0, 0, .28);
+    --switch-off: #4c4c56;
+  }
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body {
+  width: 380px;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+h2 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+p { margin: 0; }
+ul { margin: 0; padding: 0; list-style: none; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button:disabled { cursor: default; opacity: .45; }
+svg { display: block; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
+
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* ----------------------------------------------------------------- *
+ * Shell
+ * ----------------------------------------------------------------- */
+
+.app { display: flex; flex-direction: column; min-height: 240px; }
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 12px;
+}
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  background: linear-gradient(150deg, #8b7bff, #3a1fc4);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(58, 31, 196, .28);
+}
+.brand-mark svg { width: 26px; height: 26px; stroke-width: 1.5; }
+.brand-mark circle { fill: currentColor; stroke: none; }
+.brand-copy { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.brand-copy strong { font-size: 14px; font-weight: 650; letter-spacing: -.01em; }
+.account {
+  overflow: hidden;
+  color: var(--tertiary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account.is-connected { color: var(--success-text); }
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--tertiary);
+}
+.icon-button:hover { background: var(--surface-muted); color: var(--text); }
+.icon-button svg { width: 19px; height: 19px; }
+
+.view { display: grid; gap: 12px; padding: 0 16px 16px; }
+
+/* ----------------------------------------------------------------- *
+ * Cards and notices
+ * ----------------------------------------------------------------- */
+
+.notice {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.notice strong { font-size: 14px; font-weight: 650; }
+.notice p { color: var(--secondary); }
+.notice-setup { background: linear-gradient(180deg, #fff, #faf9ff); }
+
+.target-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.target-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.target-mark svg { width: 18px; height: 18px; }
+.target-copy { display: grid; gap: 1px; min-width: 0; }
+.target-copy strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.target-copy span { color: var(--tertiary); font-size: 12px; }
+.target-copy span.is-found { color: var(--success-text); }
+
+/* ----------------------------------------------------------------- *
+ * The code
+ * ----------------------------------------------------------------- */
+
+.code-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.code-value {
+  display: block;
+  width: 100%;
+  padding: 4px 0 2px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 34px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: .16em;
+  line-height: 1.1;
+  text-align: center;
+  -webkit-user-select: all;
+  user-select: all;
+}
+.code-value:hover { background: var(--surface-muted); }
+.code-source { color: var(--tertiary); font-size: 12px; text-align: center; }
+.code-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.code-origin {
+  padding: 7px 10px;
+  border-radius: var(--radius-control);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+.code-origin.is-match { background: var(--success-soft); color: var(--success-text); }
+.code-origin.is-unsure { background: var(--warn-soft); color: var(--warn-text); }
+
+/* ----------------------------------------------------------------- *
+ * Recent codes
+ * ----------------------------------------------------------------- */
+
+.history-card {
+  padding: 4px 12px 10px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.history-card > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 0;
+  cursor: pointer;
+  list-style: none;
+}
+.history-card > summary::-webkit-details-marker { display: none; }
+.history-card[open] .disclosure-chevron { transform: rotate(-135deg); }
+
+.history-list { display: grid; gap: 2px; padding-top: 2px; border-top: 1px solid var(--separator); }
+.history-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  text-align: left;
+}
+.history-row:hover { background: var(--surface-muted); }
+.history-row .history-code {
+  flex: 0 0 auto;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: .06em;
+}
+.history-row .history-meta {
+  overflow: hidden;
+  flex: 1;
+  color: var(--tertiary);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-row .history-tag {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--success-soft);
+  color: var(--success-text);
+  font-size: 10.5px;
+  font-weight: 650;
+}
+.history-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px 0; }
+.history-hint { color: var(--tertiary); font-size: 11.5px; }
+
+.reason-list { display: grid; gap: 3px; padding: 8px 2px 2px; color: var(--tertiary); font-size: 12px; }
+.reason-list li { padding-left: 12px; text-indent: -12px; }
+.reason-list li::before { content: "· "; }
+
+/* ----------------------------------------------------------------- *
+ * Controls
+ * ----------------------------------------------------------------- */
+
+.primary-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 640;
+}
+
+/* The accelerator on the button itself, the way a menu shows one. */
+.shortcut-key {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .2);
+  color: #fff;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 620;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.primary-button:hover:not(:disabled) { background: var(--accent-press); }
+.primary-button-tall { min-height: 44px; font-size: 14px; }
+.primary-button.is-busy { background: var(--accent-press); }
+
+.secondary-button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.secondary-button:hover:not(:disabled) { background: var(--surface-hover); }
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+.link-button:hover { text-decoration: underline; }
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+/* Consecutive rows share one card, hairline-separated, rather than floating. */
+.settings-group {
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.settings-group .setting-row { border-radius: 0; background: none; box-shadow: none; }
+.settings-group .setting-row + .setting-row { border-top: 1px solid var(--separator); }
+.option-copy { display: grid; gap: 1px; flex: 1; min-width: 0; }
+.option-copy strong { font-size: 13px; font-weight: 620; }
+/*
+ * Two lines are reserved whether the note needs them or not. A row that grows or
+ * shrinks when its switch is flipped drags everything below it, and the one place
+ * that must never move is the control you are still pointing at.
+ */
+.option-copy small { min-height: 2.8em; color: var(--tertiary); font-size: 12px; }
+
+.switch { position: relative; flex: 0 0 auto; width: 42px; height: 26px; }
+.switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+/*
+ * The track is decoration, and must never be the thing a click lands on.
+ *
+ * It and the checkbox are both `position: absolute; inset: 0` inside `.switch`,
+ * so with no z-index between them the later element in the DOM — this one — paints
+ * on top and takes every click. Without `pointer-events: none` the switch is only
+ * operable through its label, which looks exactly like a toggle that does nothing.
+ */
+.switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--switch-off);
+  pointer-events: none;
+  transition: background .16s ease;
+}
+.switch-track::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .22);
+  content: "";
+  transition: transform .16s ease;
+}
+.switch input:checked + .switch-track { background: var(--accent); }
+.switch input:checked + .switch-track::after { transform: translateX(16px); }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.disclosure { border-top: 1px solid var(--separator); }
+.disclosure summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 2px 2px;
+  cursor: pointer;
+  list-style: none;
+}
+.disclosure summary::-webkit-details-marker { display: none; }
+.disclosure-label { color: var(--secondary); font-size: 12px; font-weight: 600; }
+.disclosure-value { flex: 1; color: var(--tertiary); font-size: 12px; text-align: right; }
+.disclosure-chevron {
+  width: 7px;
+  height: 7px;
+  border-right: 1.6px solid var(--tertiary);
+  border-bottom: 1.6px solid var(--tertiary);
+  transform: rotate(45deg);
+  transition: transform .15s ease;
+}
+.disclosure[open] .disclosure-chevron { transform: rotate(-135deg); }
+
+/* ----------------------------------------------------------------- *
+ * Messages
+ * ----------------------------------------------------------------- */
+
+/*
+ * Space is held for the status line even when it is empty. It used to collapse,
+ * which meant the first message after any action shoved the switches, the recent
+ * list and everything else down by a line.
+ */
+.status-message { min-height: 2.8em; color: var(--secondary); font-size: 12px; }
+.status-message.is-error { color: var(--danger); }
+.status-message.is-good { color: var(--success-text); }
+.status-message.is-warn { color: var(--warn-text); }
+
+.watch-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: var(--radius-control);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+.watch-banner span:nth-child(2) { flex: 1; }
+.pulse {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .4; transform: scale(.7); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse { animation: none; }
+}
+
+.upgrade-hint {
+  padding: 9px 12px;
+  border-radius: var(--radius-control);
+  background: var(--warn-soft, rgba(180, 110, 0, .10));
+  color: var(--warn-text);
+  font-size: 12px;
+}
+.upgrade-hint .link-button { color: var(--warn-text); text-decoration: underline; }
+
+.notice .link-button { justify-self: start; }

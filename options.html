@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>2FA Paster — settings</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <div class="page">
+      <header class="page-header">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" focusable="false">
+            <rect x="4" y="11" width="24" height="13" rx="4"/>
+            <circle cx="10" cy="17.5" r="1.9"/>
+            <circle cx="16" cy="17.5" r="1.9"/>
+            <circle cx="22" cy="17.5" r="1.9"/>
+          </svg>
+        </span>
+        <div>
+          <h1>2FA Paster</h1>
+          <p class="subtitle">Settings</p>
+        </div>
+      </header>
+
+      <!-- Source ---------------------------------------------------- -->
+      <section class="card" aria-labelledby="source-title">
+        <div class="card-head">
+          <h2 id="source-title">How it reads your mail</h2>
+          <span id="source-chip" class="chip">Checking…</span>
+        </div>
+
+        <fieldset class="choices">
+          <legend class="visually-hidden">Choose how 2FA Paster reads your mail</legend>
+
+          <label class="choice" for="source-feed">
+            <input id="source-feed" name="source" type="radio" value="feed">
+            <span class="choice-body">
+              <strong>Inbox preview <span class="tag tag-good">no setup</span></strong>
+              <small>
+                Uses the Gmail session already signed in to this browser. Sees unread
+                inbox mail: who sent it, the subject, and the first line or two — which
+                is where a one-time code almost always is. Nothing to configure and no
+                permission prompts.
+              </small>
+            </span>
+          </label>
+
+          <label class="choice" for="source-api">
+            <input id="source-api" name="source" type="radio" value="api">
+            <span class="choice-body">
+              <strong>Full messages <span class="tag">one-time setup</span></strong>
+              <small>
+                Reads whole message bodies through the Gmail API, so it finds codes the
+                preview cannot reach. Needs a Google OAuth client ID of your own —
+                free, about five minutes, and the steps are below.
+              </small>
+            </span>
+          </label>
+        </fieldset>
+
+        <p id="source-detail" class="muted">Reading the current state…</p>
+
+        <div class="row-actions">
+          <button id="primary-action" class="primary-button" type="button">Check again</button>
+          <button id="open-gmail-button" class="secondary-button" type="button" hidden>Open Gmail</button>
+          <button id="disconnect-button" class="quiet-danger-button" type="button" hidden>Disconnect and forget</button>
+        </div>
+        <p id="source-status" class="status-message" role="status" aria-live="polite"></p>
+      </section>
+
+      <!-- Setup ----------------------------------------------------- -->
+      <section id="setup-section" class="card" aria-labelledby="setup-title">
+        <div class="card-head">
+          <h2 id="setup-title">Setting up full messages</h2>
+          <span id="setup-chip" class="chip">Not finished</span>
+        </div>
+        <p class="muted">
+          Only needed for the full-messages option. Google grants Gmail access to a
+          registered application rather than to extensions in general, so you register
+          one — it belongs to your Google account, and no third party sits in the middle.
+        </p>
+
+        <ol class="steps">
+          <li>
+            <h3>Copy this extension's ID</h3>
+            <p class="muted">Google ties the credential to this exact extension.</p>
+            <div class="copy-field">
+              <code id="extension-id">…</code>
+              <button id="copy-id-button" class="secondary-button" type="button">Copy</button>
+            </div>
+          </li>
+
+          <li>
+            <h3>Turn on the Gmail API</h3>
+            <p class="muted">
+              Create a Google Cloud project if you do not have one, then enable the Gmail
+              API for it.
+            </p>
+            <p class="links">
+              <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noreferrer">New project</a>
+              <a href="https://console.cloud.google.com/apis/library/gmail.googleapis.com" target="_blank" rel="noreferrer">Enable Gmail API</a>
+            </p>
+          </li>
+
+          <li>
+            <h3>Set up the consent screen</h3>
+            <p class="muted">
+              Choose <strong>External</strong>, fill in the app name and your own email,
+              then add your Google account under <strong>Test users</strong>. Leave it in
+              testing mode: reading message bodies needs a scope Google restricts, so a
+              published app would need a security review. In testing mode it works for
+              the accounts you list, which is all you need.
+            </p>
+            <p class="links">
+              <a href="https://console.cloud.google.com/auth/audience" target="_blank" rel="noreferrer">Audience and test users</a>
+            </p>
+          </li>
+
+          <li>
+            <h3>Create the OAuth client</h3>
+            <p class="muted">
+              Under <strong>Clients</strong>, choose <strong>Create client</strong>, pick
+              application type <strong>Chrome Extension</strong>, and paste the ID from
+              step 1 into <strong>Item ID</strong>. Copy the client ID it gives you — it
+              ends in <code>.apps.googleusercontent.com</code>.
+            </p>
+            <p class="links">
+              <a href="https://console.cloud.google.com/auth/clients" target="_blank" rel="noreferrer">Clients</a>
+            </p>
+          </li>
+
+          <li>
+            <h3>Give the client ID to the extension</h3>
+            <p class="muted">
+              Save it in a file called <code>client-id.local</code> beside
+              <code>package.json</code>, then rebuild and reload. The file is git-ignored,
+              so the credential stays out of the repository.
+            </p>
+            <pre class="snippet"><code>npm run build</code></pre>
+            <p class="muted small">
+              Then open <code>chrome://extensions</code> and press reload on 2FA Paster.
+            </p>
+          </li>
+        </ol>
+      </section>
+
+      <!-- Behaviour ------------------------------------------------- -->
+      <section class="card" aria-labelledby="behaviour-title">
+        <h2 id="behaviour-title">How it behaves</h2>
+
+        <div class="setting-row">
+          <label class="option-copy" for="auto-fill">
+            <strong>Fill codes in automatically</strong>
+            <small>
+              Notices a code box on a page and watches your inbox until the mail
+              arrives. Needs permission to run on the sites you visit.
+            </small>
+          </label>
+          <span class="switch">
+            <input id="auto-fill" type="checkbox">
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </div>
+
+        <div class="setting-row">
+          <label class="option-copy" for="auto-copy">
+            <strong>Also copy to the clipboard</strong>
+            <small>So you can paste it yourself if the page will not take a typed value</small>
+          </label>
+          <span class="switch">
+            <input id="auto-copy" type="checkbox">
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </div>
+
+        <div class="setting-row">
+          <label class="option-copy" for="auto-submit">
+            <strong>Submit the form after filling</strong>
+            <small>
+              Presses the form's own button when it can name one, and Enter when
+              there is no form to press. It will not press anything that reads like
+              "Resend", "Cancel" or "Try another way". Turn it off if you would
+              rather look at the code before it is used.
+            </small>
+          </label>
+          <span class="switch">
+            <input id="auto-submit" type="checkbox">
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </div>
+
+        <div class="setting-row">
+          <label class="option-copy" for="in-page-toast">
+            <strong>Confirm it on the page</strong>
+            <small>
+              A small card in the corner of the page saying a code went in, so an
+              automatic fill never looks like the page acting on its own. Never
+              shows the code itself.
+            </small>
+          </label>
+          <span class="switch">
+            <input id="in-page-toast" type="checkbox">
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </div>
+
+        <div class="setting-row">
+          <label class="option-copy" for="notify">
+            <strong>Show a desktop notification</strong>
+            <small>
+              For the times the page could not be told: no code box, or a page
+              extensions cannot touch. Then it shows the code, so you can read it
+              straight off the notification.
+            </small>
+          </label>
+          <span class="switch">
+            <input id="notify" type="checkbox">
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </div>
+
+        <div class="setting-row">
+          <label class="option-copy" for="history-minutes">
+            <strong>Keep recent codes for</strong>
+            <small>
+              The popup lists what arrived and who each code was from, which is how
+              you find the right one when two services mail you at once. Held in
+              memory only, and dropped when Chrome closes.
+            </small>
+          </label>
+          <select id="history-minutes">
+            <option value="0">Do not keep a list</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">1 hour</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <label class="option-copy" for="freshness">
+            <strong>Ignore codes older than</strong>
+            <small>A code that has already expired is worse than none at all</small>
+          </label>
+          <select id="freshness">
+            <option value="5">5 minutes</option>
+            <option value="10">10 minutes</option>
+            <option value="20">20 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">1 hour</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <label class="option-copy" for="clipboard-clear">
+            <strong>Wipe the clipboard after</strong>
+            <small>Overwrites the copied code so it is not left lying around</small>
+          </label>
+          <select id="clipboard-clear">
+            <option value="0">Never</option>
+            <option value="30">30 seconds</option>
+            <option value="60">1 minute</option>
+            <option value="300">5 minutes</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Searching ------------------------------------------------- -->
+      <section id="search-section" class="card" aria-labelledby="search-title">
+        <div class="card-head">
+          <h2 id="search-title">Finding the mail</h2>
+          <span class="chip">Full messages only</span>
+        </div>
+        <p class="muted">
+          The Gmail API reader searches recent messages whose subject or body uses the
+          vocabulary of a code delivery. Spam, trash, drafts and sent mail are never
+          read. The inbox preview does not search — it only ever sees unread inbox mail.
+        </p>
+
+        <div class="setting-row">
+          <label class="option-copy" for="scan-all">
+            <strong>Fall back to all recent mail</strong>
+            <small>
+              When the keyword search finds nothing, look at recent messages regardless
+              of subject. Catches unusual senders; reads more of your mail.
+            </small>
+          </label>
+          <span class="switch">
+            <input id="scan-all" type="checkbox">
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </div>
+
+        <div class="field-row">
+          <label class="option-copy" for="extra-query">
+            <strong>Extra search terms</strong>
+            <small>Gmail search syntax, combined with the built-in query. For example <code>from:*.bank.example</code>.</small>
+          </label>
+          <input id="extra-query" type="text" maxlength="200" placeholder="(optional)" autocomplete="off" spellcheck="false">
+        </div>
+      </section>
+
+      <!-- Shortcut -------------------------------------------------- -->
+      <section class="card" aria-labelledby="extras-title">
+        <h2 id="extras-title">Shortcut</h2>
+        <p class="muted">
+          <span id="shortcut-value">No keyboard shortcut is set.</span>
+          It is the quickest way to use this — no popup, no clicking — so it is worth
+          having one you will remember. Chrome keeps shortcuts on its own page, and
+          will leave the suggested combination unassigned if something else already
+          claims it.
+        </p>
+        <div class="row-actions">
+          <button id="shortcut-button" class="secondary-button" type="button">Change shortcut</button>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="privacy-title">
+        <h2 id="privacy-title">What this can see</h2>
+        <ul class="plain-list">
+          <li>
+            <strong>Inbox preview.</strong> Fetches Gmail's own inbox feed with the
+            session cookie your browser already has. It returns unread inbox mail only,
+            and only the sender, subject, a snippet and a timestamp — never a full
+            message, and never anything you have already read.
+          </li>
+          <li>
+            <strong>Full messages.</strong> Uses the <code>gmail.readonly</code> scope,
+            because Google has no narrower scope that includes message bodies. Used only
+            to fetch the few recent messages that match the code search.
+          </li>
+          <li>
+            Codes are held in session storage, which lives in memory and is dropped when
+            Chrome closes. Nothing is written to disk and nothing is sent anywhere except
+            to Google.
+          </li>
+          <li>
+            No server, no analytics, no third party. If you use the full-messages option,
+            the OAuth client belongs to your Google account, not to this extension's
+            author.
+          </li>
+        </ul>
+        <p id="options-status" class="status-message" role="status" aria-live="polite"></p>
+      </section>
+    </div>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

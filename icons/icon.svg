@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="2FA Paster">
+  <title>2FA Paster</title>
+  <defs>
+    <linearGradient id="backdrop" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b7bff"/>
+      <stop offset="1" stop-color="#3a1fc4"/>
+    </linearGradient>
+    <!-- White where the field shows, black where the digits are punched out, so
+         the holes fall through to the gradient instead of being painted a flat
+         colour that would not match it. -->
+    <mask id="digits">
+      <rect x="16" y="38" width="96" height="52" rx="16" fill="#fff"/>
+      <circle cx="40" cy="64" r="8" fill="#000"/>
+      <circle cx="64" cy="64" r="8" fill="#000"/>
+      <circle cx="88" cy="64" r="8" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#backdrop)"/>
+  <rect x="16" y="38" width="96" height="52" rx="16" fill="#fff" mask="url(#digits)"/>
+</svg>

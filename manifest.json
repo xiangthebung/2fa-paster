@@ -1,0 +1,63 @@
+{
+  "manifest_version": 3,
+  "name": "2FA Paster — codes from Gmail",
+  "short_name": "2FA Paster",
+  "version": "1.1.0",
+  "description": "Pulls the newest two-factor code out of your Gmail and drops it into the page, or onto your clipboard.",
+  "minimum_chrome_version": "116",
+
+  "permissions": [
+    "identity",
+    "storage",
+    "activeTab",
+    "scripting",
+    "alarms",
+    "notifications",
+    "offscreen",
+    "clipboardWrite"
+  ],
+
+  "host_permissions": [
+    "https://mail.google.com/*",
+    "https://gmail.googleapis.com/*",
+    "https://oauth2.googleapis.com/*"
+  ],
+
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+
+  "oauth2": {
+    "client_id": "REPLACE_WITH_YOUR_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": ["https://www.googleapis.com/auth/gmail.readonly"]
+  },
+
+  "background": { "service_worker": "background.js", "type": "module" },
+
+  "action": {
+    "default_title": "Get my 2FA code",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+
+  "options_ui": { "page": "options.html", "open_in_tab": true },
+
+  "commands": {
+    "paste-code": {
+      "suggested_key": { "default": "Ctrl+Shift+2" },
+      "description": "Fetch the newest code and fill it into this page"
+    }
+  },
+
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src https://mail.google.com https://gmail.googleapis.com https://oauth2.googleapis.com;"
+  }
+}

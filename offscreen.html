@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>2FA Paster clipboard</title>
+  </head>
+  <body>
+    <!--
+      Never shown. A service worker has no document, and the async Clipboard API
+      needs a focused one, so copying happens here against a real textarea. See
+      offscreen.js.
+    -->
+    <textarea id="staging" aria-hidden="true" tabindex="-1"></textarea>
+    <script src="offscreen.js"></script>
+  </body>
+</html>

@@ -1,0 +1,374 @@
+# 2FA Paster
+
+Gets the one-time code out of your Gmail and puts it where you need it, so you
+stop switching to a mail tab, hunting for the newest message, and copying six
+digits by hand.
+
+Two ways to use it:
+
+- **Ask for it.** Click the toolbar button, or press the keyboard shortcut. It
+  reads your recent mail, works out which number is the code, types it into the
+  code box on the page you are on, submits the form, and copies the code as well.
+- **Let it happen.** Turn on automatic filling. When a page shows a code box, it
+  watches your inbox for a couple of minutes and the code lands in the box on its
+  own, a second or two after the mail arrives.
+
+Either way it says so on the page afterwards, and with several services mailing codes
+at once it works out which one belongs to the site you are actually on.
+
+## Install
+
+```
+npm run build
+```
+
+Then `chrome://extensions` → **Developer mode** → **Load unpacked** → pick
+`dist/`.
+
+That is the whole setup. If you are signed in to Gmail in this browser, it works
+immediately — no accounts to create, no credentials to paste, no permission
+prompts beyond the install.
+
+---
+
+## How it reads your mail
+
+There are two readers. The default needs nothing from you; the other sees more.
+
+### Inbox preview (default, no setup)
+
+Gmail serves a per-account Atom feed of unread inbox mail at
+`https://mail.google.com/mail/u/<n>/feed/atom`, authenticated by the ordinary
+Gmail session cookie. With a host permission for `mail.google.com`, the extension
+fetches it with `credentials: 'include'` and gets the sender, subject, a snippet
+of the body, and a timestamp. This is the mechanism the long-standing Gmail
+checker extensions use, and it is why they appear to need no setup either.
+
+For one-time codes it is a good fit, in ways that are not obvious:
+
+- The feed lists **only unread inbox mail**, so it is naturally scoped to messages
+  that just arrived and have not been dealt with — which is exactly what a code is.
+- It carries far less text than a full message, so there are fewer decoy numbers
+  to score against.
+
+Two honest limitations:
+
+- **The snippet is not the body.** If a code sits further into the message than the
+  preview reaches, and is not in the subject, this reader cannot see it. In
+  practice that is rare, because a code mail's whole job is to put the code where
+  you will see it first.
+- **It is a legacy endpoint.** Google's current documentation describes the feed as
+  a Workspace feature and says nothing about the cookie-authenticated consumer
+  case that still works in practice. It could be withdrawn, which is why the other
+  reader exists.
+
+### Full messages (optional, one-time setup)
+
+The Gmail API over OAuth, reading whole message bodies. Finds codes the preview
+cannot reach, and lets you narrow the search with Gmail query syntax. The cost is
+a Google Cloud OAuth client of your own — free, about five minutes, and detailed
+below.
+
+Switch between the two on the options page. The popup also offers the upgrade at
+the moment it is actually relevant: after a search comes up empty.
+
+---
+
+## Setting up full messages
+
+Only needed if you choose that reader. Google grants Gmail access to a registered
+application rather than to extensions in general, so you register one; it belongs
+to your Google account, with no third party in the middle. The options page walks
+through the same steps with the right links and your extension ID already filled
+in.
+
+1. **Copy the extension ID.** `chrome://extensions` shows a 32-character ID under
+   the extension's name; the options page shows it with a copy button. An unpacked
+   extension's ID comes from its folder path, so it stays put as long as you do
+   not move the project — see [Pinning the extension ID](#pinning-the-extension-id)
+   if you need it to survive a move.
+
+2. **Enable the Gmail API.**
+   [Create a project](https://console.cloud.google.com/projectcreate), then
+   [enable the Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com).
+
+3. **Configure the consent screen.** User type **External**, fill in an app name
+   and your email, and add your Google account under **Test users**.
+
+   Leave it in testing mode. Reading message bodies needs the `gmail.readonly`
+   scope, which Google classifies as *restricted*: publishing an app that requests
+   it requires verification and a third-party security assessment. In testing mode
+   the scope works normally for the accounts you list. Google will show an
+   "unverified app" warning the first time you connect — that is this situation,
+   not a fault.
+
+4. **Create the OAuth client.** **Clients** → **Create client** → application type
+   **Chrome Extension**, and paste the extension ID into **Item ID**. Copy the
+   client ID; it ends in `.apps.googleusercontent.com`.
+
+5. **Give it to the build.** Save it in `client-id.local` next to `package.json`:
+
+   ```
+   1234567890-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com
+   ```
+
+   Then `npm run build` and reload the extension. The file is git-ignored and the
+   build writes the value into `dist/manifest.json`, so the committed manifest
+   keeps its placeholder. `GMAIL_CLIENT_ID` in the environment works too.
+
+### Pinning the extension ID
+
+Only needed if you plan to move the project folder or load it on another machine,
+since a moved unpacked extension gets a new ID and the OAuth client stops
+matching.
+
+Upload the zip from `npm run zip` to the Chrome Web Store dashboard without
+publishing, open **Package** → **View public key**, and put the key — one line, no
+`BEGIN`/`END` markers — in `extension-key.local`. The build writes it into the
+manifest as `key`, fixing the ID.
+
+---
+
+## Using it
+
+**The popup.** Shows whether the current page has a code box, fetches the newest
+code, and displays it large enough to read at a glance — click it to copy. When the
+mail demonstrably came from the site you are on, it says so; when several codes
+arrived and none of them did, it says that instead. *Why this one* lists the signals
+that picked it, which is worth a look the first few times and when a message is
+unusual. Below that, a collapsed list of the codes that arrived recently and who each
+was from.
+
+**The keyboard shortcut.** `Ctrl+Shift+2` by default — `Command+Shift+2` on macOS,
+which Chrome substitutes on its own. Fetch and fill without opening anything, which
+is the fastest way to use this, so the popup prints the shortcut on the button that
+does the same job rather than hiding it in a footnote.
+
+`Ctrl+Shift+<digit>` is the conventional range for extension shortcuts, and Chrome
+requires every combination to include `Ctrl` or `Alt` — a bare key is not available
+to any extension. If something else has already claimed the combination, Chrome
+leaves the command unbound and the popup omits the hint; assign your own at
+`chrome://extensions/shortcuts`. Note that changing the suggestion here does not
+rebind an extension that is already installed.
+
+**Automatic filling.** Off by default, because it needs permission to run on the
+sites you visit — a code box can appear on any page, so there is no narrower way
+to notice one. With it on, a code box starts a two-minute inbox watch; the first
+confidently-identified code that arrives gets filled in and the watch ends.
+
+Automatic filling is deliberately more cautious than the manual path. It only
+accepts a code that arrived around the time the box appeared, never re-uses one it
+has already delivered, and requires a confidence score of 55 or better. A number
+that merely sits near the word "code" will not be typed into a page unasked; the
+popup holds it instead.
+
+It also declines to guess between services. If several codes have arrived and none
+of them can be tied to the site in front of you, nothing is typed in — the popup
+holds the best candidate and says why it is unsure. See
+[which code is yours](#which-code-is-yours).
+
+### Settings worth knowing about
+
+| Setting | Default | Why you might change it |
+| --- | --- | --- |
+| How it reads your mail | Inbox preview | Switch to full messages if a code is ever too far into the body to appear in the preview |
+| Ignore codes older than | 10 minutes | Shorter if you get a lot of code mail; longer for services that are slow to send |
+| Also copy to the clipboard | On | Leave on — it is the fallback when a page refuses a typed value |
+| Submit the form after filling | **On** | Off if you would rather look at the code before it is used |
+| Confirm it on the page | On | Off if you find the corner card in the way |
+| Keep recent codes for | 30 minutes | Off if you would rather nothing were remembered; longer if you want a wider view |
+| Show a desktop notification | On | It only fires when the page could not be told, so there is rarely a reason to change it |
+| Wipe the clipboard after | Never | Set it if you would rather not leave a code in the clipboard |
+| Fall back to all recent mail | Off | Full-messages reader only: on if a service words its mail unusually |
+| Extra search terms | empty | Full-messages reader only. Gmail search syntax, e.g. `from:*.bank.example` |
+
+### Submitting, and why it is on
+
+Typing a code and then pressing the only button on the page is not a decision
+anybody makes — it is a step. So the extension takes it, and the care goes into
+*how* rather than *whether*:
+
+- Only inside the form holding the field that was filled. Nothing on the wider page
+  is ever pressed.
+- Only a button that reads like one. `Verify`, `Continue`, `Submit` and the like are
+  pressed; anything reading `Resend`, `Cancel`, `Try another way` or `Sign out` is
+  skipped outright, even when it is the form's declared submit button — pressing
+  "Resend code" would invalidate the code that was just filled in.
+- A button that is disabled until the page catches up is waited for, briefly. That
+  is the ordinary state of a code form a few milliseconds after the value lands, and
+  clicking the page's own button is the path it designed and tested.
+- With no form to submit — a modal handling the key itself — Enter is pressed
+  instead, which is what a person would do.
+
+A small card appears in the corner of the page afterwards saying what happened. It
+matters most here: with submitting automatic, the form can be gone before you have
+worked out why.
+
+### Recent codes
+
+The popup keeps a collapsed list of what arrived in the last half hour, each row
+naming its sender and, when it was filled, the site it went into. It is there for the
+cases nothing automatic can get right — two services mailing within seconds of each
+other, a code filled into the tab you had open before this one, a page that swallowed
+one without saying so. Clicking a row copies that code and fills it into the current
+page.
+
+The list lives in memory with everything else, so it goes when Chrome closes, and
+**Clear** empties it on the spot.
+
+---
+
+## How it works
+
+```
+popup.js / options.js      UI. Reads a status object, sends commands.
+        │
+background.js              Service worker. Orchestrates everything.
+        ├── inbox-feed.js   Default reader: Atom feed over the Gmail session.
+        ├── gmail.js        Optional reader: Gmail REST + MIME.
+        │   └── auth.js     chrome.identity: token in, token out.
+        ├── text.js         Entity decoding and HTML flattening, shared.
+        ├── code-finder.js  Which number is the code. Pure, and tested.
+        │   └── domains.js  Who sent it, and what site am I on. Pure.
+        ├── settings.js     Preferences (sync) and session state (memory).
+        ├── content.js      Injected into the page: find the box, type into it.
+        └── offscreen.js    Clipboard, which a service worker cannot reach.
+```
+
+Both readers produce the same `{ id, from, subject, text, receivedAt }` shape and
+hand it to the same scorer, so switching between them changes what can be seen,
+not how it is judged.
+
+Three parts carry the interesting problems.
+
+**`code-finder.js` — which number is the code.** A code mail is mostly other
+numbers: dates, order references, a year in the copyright line, a phone number in
+the footer, tracking ids in every link. Taking the first six-digit run gets it
+wrong often enough to be useless. So candidates are scored: how close they sit to
+a phrase like "verification code", whether they appear in the subject, whether
+they stand alone on their own line, whether the sender matches the site you are
+signing in to — against penalties for sitting just after "order number" or looking
+like a year, a time, an amount or a fragment of something longer. Links and email
+addresses are removed before scanning, and zero-width characters — which some
+senders scatter through the code to defeat scrapers — are stripped rather than
+treated as breaks.
+
+<a id="which-code-is-yours"></a>
+
+**`code-finder.js` and `domains.js` — which code is yours.** A separate question from
+the one above, and it only shows up once the inbox has more than one code in it —
+which, on an ordinary afternoon, it does. The best-written code mail is not
+necessarily the one for the page you are looking at, so wording cannot decide this;
+the sender has to.
+
+A message is tied to the site in front of you by its sender's domain, its display
+name, its subject, or the body naming the site outright — `email.github.com` and
+`slack-mail.com` count, because a service that mails from a dedicated domain usually
+keeps its name in it. Once *any* message is tied to the site, messages identifiably
+from other companies are removed from consideration entirely rather than merely
+outscored: a code from Stripe is never the right answer on a GitHub login, however
+well the mail is written.
+
+The interesting part is what is *not* treated as belonging to somebody else. A great
+many services mail through SendGrid or Amazon SES, or from a domain naming the
+channel rather than the company. Those senders prove nothing, so they stay in
+contention with a penalty. And when several codes arrive with nothing tying any of
+them to the page, that is reported as ambiguous rather than resolved: the popup still
+shows its best guess, because you can see it and judge, but the unattended path
+refuses to type it in.
+
+**`content.js` — which input is the code box.** `autocomplete="one-time-code"`
+settles it when present, and often it is absent. Everything else is inference from
+names, labels and shape, including the row-of-single-character-boxes pattern. The
+expensive mistake is a false positive, so anything resembling a card number, a
+CVV, a postcode or a password is disqualified outright rather than merely
+outscored — note that "security code" is the CVV label on most checkout pages.
+Writing the value is its own problem: a React-controlled input discards a plain
+`.value =` assignment, so the write goes through the prototype's setter with the
+events a real keystroke would produce, and every fill is read back afterwards with
+a synthetic paste as the fallback.
+
+---
+
+## What it can see
+
+- **Inbox preview.** Unread inbox mail only, and only its sender, subject, snippet
+  and timestamp. Never a full message, and never anything you have already read.
+  Authenticated by the Gmail cookie your browser already has; the extension never
+  sees a password. Note that the `mail.google.com` host permission is broader than
+  that: Chrome grants access per host, not per URL, so the restriction to the feed
+  is enforced by this code rather than by the browser.
+- **Full messages.** The `gmail.readonly` scope, because Google has no narrower
+  scope that includes bodies. Used only to run the code search and read the few
+  matching messages. Spam, trash, drafts and sent mail are excluded from every
+  query.
+- **Codes.** Held in `chrome.storage.session`, which is memory-backed and dropped
+  when Chrome closes. Nothing is written to disk.
+- **Pages.** By default the filler is injected only into the tab you are on, at the
+  moment you ask for a code. Automatic filling needs the broader grant and asks for
+  it explicitly.
+- **Network.** `mail.google.com`, `gmail.googleapis.com`, `oauth2.googleapis.com`.
+  Nothing else, which the manifest's `connect-src` enforces.
+
+See [PRIVACY_POLICY.md](PRIVACY_POLICY.md).
+
+---
+
+## Development
+
+```
+npm test           the pure logic: code-finder, domains, inbox-feed, gmail, text, settings, wiring
+npm run build      assemble dist/
+npm run watch      rebuild on change
+npm run zip        build, then a verified artifacts/2fa-paster-<version>.zip
+npm run verify     test, then build
+npm run icons      re-export the PNGs after editing icons/icon.svg
+```
+
+Plain ES modules, no runtime dependencies. The build is a copy plus the client-ID
+substitution, from an explicit allowlist in `scripts/build.mjs`. It reads the
+assembled output back and fails if the manifest, the HTML or the modules reference
+a file that is not there, and it parses every shipped script — a broken
+`content.js` would otherwise only announce itself in the page's console, where
+nobody is looking.
+
+`content.js` is a classic script, not a module, because Chrome does not load
+content scripts as modules. The build fails if an `import` appears in it.
+
+### What the tests cover
+
+The parts that fail quietly. A scorer that picks the order number, a MIME decoder
+that returns an empty string, a feed parser that returns no entries, a domain
+comparison that decides your own bank is a different company — none of these throw.
+So `code-finder`, `domains`, `inbox-feed`, `gmail`, `text` and the recent list are
+covered directly, including the awkward cases: split codes (`123 456`), four-digit
+bank codes, alphanumeric codes, zero-width characters mid-code, entity-encoded
+subjects, an account slot that answers with the wrong mailbox, `co.uk` domains, and
+messages where the right answer sits next to a year, a phone number and an order
+reference.
+
+The five-services case has its own tests: five code mails in one inbox, and the
+right one picked for each of the five sites — plus the case where none of them can
+be tied to the page, which has to report itself as a guess rather than resolve.
+
+`tests/wiring.test.mjs` checks the seams that only meet at runtime and only
+through strings: element ids against the HTML, message types against the worker's
+handlers, the CSP against the hosts actually called.
+
+Field detection in `content.js` needs a real page and is not unit tested. Check it
+by loading a login flow and watching the popup report whether it found a box.
+
+---
+
+## Limits
+
+- **Gmail only.** Another provider would need its own reader; `inbox-feed.js` and
+  `gmail.js` are where that would go.
+- **The preview can miss a buried code.** Switch readers if it happens.
+- **Not publishable as-is.** A public listing requesting `gmail.readonly` needs
+  Google's restricted-scope verification and a security assessment. As a personal
+  tool, none of that applies.
+- **Codes in spam are not read**, deliberately, by either reader.
+- **Some pages cannot be filled.** `chrome://` pages, the Web Store and other
+  extensions' pages are off limits to every extension. The code is copied instead,
+  and the popup says so.

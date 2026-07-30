@@ -1,0 +1,16 @@
+node_modules/
+
+# Build output. Assembled by `npm run build`; load this in Chrome.
+dist/
+
+# Store upload artifacts, produced by `npm run zip`.
+artifacts/
+*.zip
+
+# Your Google OAuth client ID and your pinned extension key. These identify
+# *your* Cloud project, so they stay out of the repository. The build reads them
+# and writes them into dist/manifest.json. See README.md -> Setup.
+client-id.local
+extension-key.local
+
+.DS_Store

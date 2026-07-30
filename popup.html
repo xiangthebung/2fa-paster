@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>2FA Paster</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <div class="app">
+      <header class="app-header">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" focusable="false">
+            <rect x="4" y="11" width="24" height="13" rx="4"/>
+            <circle cx="10" cy="17.5" r="1.9"/>
+            <circle cx="16" cy="17.5" r="1.9"/>
+            <circle cx="22" cy="17.5" r="1.9"/>
+          </svg>
+        </span>
+        <span class="brand-copy">
+          <strong>2FA Paster</strong>
+          <span id="account" class="account">Checking your connection…</span>
+        </span>
+        <button id="settings-button" class="icon-button" type="button" aria-label="Settings and setup" title="Settings and setup">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 4.5v2m0 11v2m-6.5-9.5 1.7 1M17.8 15l1.7 1M4.5 15l1.7-1M17.8 9l1.7-1"/></svg>
+        </button>
+      </header>
+
+      <main class="view">
+        <!--
+          One adaptive card rather than a card per failure. What stands between
+          you and a code depends on which reader is active — a Gmail session for
+          the inbox feed, an OAuth client and grant for the API — and the popup
+          should state the one thing to do next, not enumerate the possibilities.
+        -->
+        <section id="notice" class="notice" hidden>
+          <strong id="notice-title"></strong>
+          <p id="notice-body"></p>
+          <button id="notice-action" class="primary-button" type="button"></button>
+          <button id="notice-alt" class="link-button" type="button" hidden></button>
+        </section>
+
+        <div id="ready" hidden>
+          <div class="target-card">
+            <span id="target-mark" class="target-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M4.5 6.5h15v11h-15zM4.5 8l7.5 5 7.5-5"/></svg>
+            </span>
+            <span class="target-copy">
+              <strong id="target-site">This page</strong>
+              <span id="target-field">Looking for a code box…</span>
+            </span>
+          </div>
+
+          <!--
+            The shortcut sits on the button that does the same thing, the way a menu
+            shows its accelerator. It was previously a grey line in the footer,
+            which is nowhere anybody looks for the fastest way to use this.
+          -->
+          <button id="paste-button" class="primary-button primary-button-tall" type="button">
+            <span id="paste-label">Get my code</span>
+            <kbd id="shortcut-hint" class="shortcut-key" hidden></kbd>
+          </button>
+
+          <section id="code-card" class="code-card" aria-labelledby="code-heading" hidden>
+            <h2 id="code-heading" class="visually-hidden">The code that was found</h2>
+            <button id="code-value" class="code-value" type="button" title="Click to copy"></button>
+            <p id="code-source" class="code-source"></p>
+            <!--
+              Said out loud only when it is worth saying: that the mail came from
+              the site you are on, or that nothing tied it to any site. Silent in
+              between, which is most of the time.
+            -->
+            <p id="code-origin" class="code-origin" hidden></p>
+            <div class="code-actions">
+              <button id="copy-button" class="secondary-button" type="button">Copy</button>
+              <button id="fill-button" class="secondary-button" type="button">Fill this page</button>
+            </div>
+            <details id="code-why" class="disclosure">
+              <summary>
+                <span class="disclosure-label">Why this one</span>
+                <span id="code-confidence" class="disclosure-value"></span>
+                <span class="disclosure-chevron" aria-hidden="true"></span>
+              </summary>
+              <ul id="code-reasons" class="reason-list"></ul>
+            </details>
+          </section>
+
+          <p id="status" class="status-message" role="status" aria-live="polite"></p>
+
+          <!--
+            Recent arrivals, collapsed. This is how you get at the right code when
+            two services mailed you at once and the wrong one went in — so each row
+            names its sender, and clicking one puts it in the page.
+          -->
+          <details id="history-card" class="history-card" hidden>
+            <summary>
+              <span class="disclosure-label">Recent codes</span>
+              <span id="history-count" class="disclosure-value"></span>
+              <span class="disclosure-chevron" aria-hidden="true"></span>
+            </summary>
+            <ul id="history-list" class="history-list"></ul>
+            <div class="history-foot">
+              <span class="history-hint">Click one to fill it into this page</span>
+              <button id="history-clear" class="link-button" type="button">Clear</button>
+            </div>
+          </details>
+
+          <!-- Grouped into one card, so two switches read as a short list. -->
+          <div class="settings-group">
+            <!--
+              The notes describe what each switch does and do not change when it is
+              flipped. Rewriting them on toggle made the popup jump, and the switch
+              already says which way it is set — that is what a switch is for.
+            -->
+            <div class="setting-row">
+              <label class="option-copy" for="auto-fill">
+                <strong>Fill it in automatically</strong>
+                <small id="auto-note">Watches for a code box and fills it as soon as the mail lands</small>
+              </label>
+              <span class="switch">
+                <input id="auto-fill" type="checkbox">
+                <span class="switch-track" aria-hidden="true"></span>
+              </span>
+            </div>
+
+            <div class="setting-row">
+              <label class="option-copy" for="auto-submit">
+                <strong>Submit it too</strong>
+                <small>Presses the form's own button, or Enter, once the code is in</small>
+              </label>
+              <span class="switch">
+                <input id="auto-submit" type="checkbox">
+                <span class="switch-track" aria-hidden="true"></span>
+              </span>
+            </div>
+          </div>
+
+          <p id="watch-banner" class="watch-banner" hidden>
+            <span class="pulse" aria-hidden="true"></span>
+            <span id="watch-text">Watching your inbox…</span>
+            <button id="stop-watch-button" class="link-button" type="button">Stop</button>
+          </p>
+
+          <!--
+            Offered only after a search comes up empty on the feed, because that is
+            the one failure the full-text reader actually fixes: a code sitting
+            further into the message than the feed's preview reaches.
+          -->
+          <p id="upgrade-hint" class="upgrade-hint" hidden>
+            Not finding it? The preview only covers the first line or two.
+            <button id="upgrade-button" class="link-button" type="button">Read full messages instead</button>
+          </p>
+        </div>
+      </main>
+    </div>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

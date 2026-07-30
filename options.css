@@ -1,0 +1,362 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f4f3f8;
+  --surface: #ffffff;
+  --surface-muted: #eeedf4;
+  --surface-hover: #f8f7fb;
+  --separator: rgba(60, 60, 67, .14);
+  --text: #1d1d1f;
+  --secondary: #4a4a52;
+  --tertiary: #6a6a74;
+  --accent: #5b45e0;
+  --accent-press: #4a37c4;
+  --accent-text: #4a37c4;
+  --accent-soft: rgba(91, 69, 224, .10);
+  --success-text: #1b7a3a;
+  --success-soft: rgba(27, 122, 58, .12);
+  --danger: #d70015;
+  --danger-soft: rgba(215, 0, 21, .09);
+  --warn-text: #8a5300;
+  --warn-soft: rgba(180, 110, 0, .14);
+  --focus: rgba(91, 69, 224, .55);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, .05), 0 6px 16px rgba(0, 0, 0, .04);
+  --switch-off: #d6d6de;
+  --radius-card: 14px;
+  --radius-control: 11px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+}
+
+/* Same tokens as the popup, so the two pages cannot drift apart in dark mode. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1c1f;
+    --surface: #26262b;
+    --surface-muted: #32323a;
+    --surface-hover: #2e2e35;
+    --separator: rgba(235, 235, 245, .14);
+    --text: #f2f2f5;
+    --secondary: #c8c8d0;
+    --tertiary: #9a9aa5;
+    --accent: #6d5bff;
+    --accent-press: #5b45e0;
+    --accent-text: #b3a8ff;
+    --accent-soft: rgba(109, 91, 255, .18);
+    --success-text: #5fd18a;
+    --success-soft: rgba(95, 209, 138, .16);
+    --danger: #ff6961;
+    --danger-soft: rgba(255, 105, 97, .16);
+    --warn-text: #f0b849;
+    --warn-soft: rgba(240, 184, 73, .16);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 16px rgba(0, 0, 0, .28);
+    --switch-off: #4c4c56;
+  }
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  padding: 36px 20px 64px;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page { display: grid; gap: 16px; max-width: 680px; margin: 0 auto; }
+
+h1 { margin: 0; font-size: 22px; font-weight: 680; letter-spacing: -.02em; }
+h2 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
+h3 { margin: 0 0 2px; font-size: 14px; font-weight: 640; }
+p { margin: 0; }
+ul, ol { margin: 0; padding: 0; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: default; opacity: .45; }
+svg { display: block; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
+a { color: var(--accent-text); text-decoration: none; font-weight: 600; }
+a:hover { text-decoration: underline; }
+code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--surface-muted);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: .9em;
+}
+
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+}
+
+/* ----------------------------------------------------------------- *
+ * Shell
+ * ----------------------------------------------------------------- */
+
+.page-header { display: flex; align-items: center; gap: 12px; padding: 0 2px 4px; }
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  background: linear-gradient(150deg, #8b7bff, #3a1fc4);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(58, 31, 196, .3);
+}
+.brand-mark svg { width: 32px; height: 32px; stroke-width: 1.5; }
+.brand-mark circle { fill: currentColor; stroke: none; }
+.subtitle { color: var(--tertiary); font-size: 13px; }
+
+.card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.card-head { display: flex; align-items: center; gap: 10px; }
+.card-head h2 { flex: 1; }
+
+.chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--secondary);
+  font-size: 12px;
+  font-weight: 640;
+  white-space: nowrap;
+}
+.chip.is-good { background: var(--success-soft); color: var(--success-text); }
+.chip.is-warn { background: var(--warn-soft); color: var(--warn-text); }
+.chip.is-bad { background: var(--danger-soft); color: var(--danger); }
+
+.muted { color: var(--secondary); }
+.muted.small { font-size: 13px; color: var(--tertiary); }
+.links { display: flex; flex-wrap: wrap; gap: 14px; }
+
+/* A section that does not apply to the active reader. Readable, but clearly not
+   the thing being configured right now. */
+.card.is-dimmed { opacity: .62; }
+.card.is-dimmed:hover,
+.card.is-dimmed:focus-within { opacity: 1; }
+
+.tag {
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--tertiary);
+  font-size: 11px;
+  font-weight: 640;
+  letter-spacing: .01em;
+  text-transform: none;
+  vertical-align: 1px;
+}
+.tag-good { background: var(--success-soft); color: var(--success-text); }
+
+/* ----------------------------------------------------------------- *
+ * Source choice
+ * ----------------------------------------------------------------- */
+
+.choices { display: grid; gap: 10px; margin: 0; padding: 0; border: 0; }
+
+.choice {
+  display: flex;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-card);
+  cursor: pointer;
+}
+.choice:hover { background: var(--surface-hover); }
+.choice input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  margin: 1px 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.choice:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.choice:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+.choice-body { display: grid; gap: 3px; }
+.choice-body strong { font-size: 14px; font-weight: 640; }
+.choice-body small { color: var(--tertiary); font-size: 13px; line-height: 1.45; }
+
+/* ----------------------------------------------------------------- *
+ * Steps
+ * ----------------------------------------------------------------- */
+
+.steps { display: grid; gap: 18px; margin: 2px 0 0; padding: 0; counter-reset: step; list-style: none; }
+.steps > li { display: grid; gap: 6px; padding-left: 38px; position: relative; counter-increment: step; }
+.steps > li::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  content: counter(step);
+  font-size: 13px;
+  font-weight: 680;
+}
+
+.copy-field { display: flex; align-items: center; gap: 8px; }
+.copy-field code {
+  flex: 1;
+  overflow: hidden;
+  padding: 8px 10px;
+  border-radius: var(--radius-control);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  -webkit-user-select: all;
+  user-select: all;
+}
+
+.snippet {
+  margin: 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border-radius: var(--radius-control);
+  background: #1d1b2b;
+  color: #eae8ff;
+}
+.snippet code { padding: 0; background: none; color: inherit; font-size: 13px; }
+
+.plain-list { display: grid; gap: 8px; padding-left: 18px; color: var(--secondary); list-style: disc; }
+
+/* ----------------------------------------------------------------- *
+ * Controls
+ * ----------------------------------------------------------------- */
+
+.row-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+.primary-button {
+  min-height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 640;
+}
+.primary-button:hover:not(:disabled) { background: var(--accent-press); }
+
+.secondary-button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.secondary-button:hover:not(:disabled) { background: var(--surface-hover); }
+
+.quiet-danger-button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+.quiet-danger-button:hover:not(:disabled) { background: var(--danger-soft); }
+
+.setting-row,
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--separator);
+}
+.field-row { flex-wrap: wrap; }
+.setting-row:first-of-type,
+.field-row:first-of-type { border-top: 0; }
+
+.option-copy { display: grid; gap: 2px; flex: 1; min-width: 220px; }
+.option-copy strong { font-size: 14px; font-weight: 620; }
+.option-copy small { color: var(--tertiary); font-size: 13px; line-height: 1.45; }
+
+select,
+input[type="text"] {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-size: 13px;
+}
+select { min-width: 130px; }
+input[type="text"] { flex: 1; min-width: 240px; }
+
+.switch { position: relative; flex: 0 0 auto; width: 44px; height: 27px; }
+.switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+/*
+ * Decoration only: see the note in popup.css. Both this and the checkbox are
+ * absolutely positioned over the same box, so without this the track paints on top
+ * and the switch can only be operated through its label.
+ */
+.switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--switch-off);
+  pointer-events: none;
+  transition: background .16s ease;
+}
+.switch-track::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .22);
+  content: "";
+  transition: transform .16s ease;
+}
+.switch input:checked + .switch-track { background: var(--accent); }
+.switch input:checked + .switch-track::after { transform: translateX(17px); }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Height held even when empty, so a saved message does not nudge the page. */
+.status-message { min-height: 1.5em; color: var(--secondary); font-size: 13px; }
+.status-message:empty { display: none; }
+.status-message.is-error { color: var(--danger); }
+.status-message.is-good { color: var(--success-text); }
+.status-message.is-warn { color: var(--warn-text); }
