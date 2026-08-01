@@ -80,7 +80,11 @@ function renderSource(status) {
   // visible so they can be read before switching, but they stop shouting.
   els.setupSection.classList.toggle('is-dimmed', usingFeed);
   els.searchSection.classList.toggle('is-dimmed', usingFeed);
-  els.setupChip.textContent = status.apiConfigured ? 'Done' : 'Not finished';
+  els.setupChip.textContent = !status.apiConfigured
+    ? 'Setup needed'
+    : !usingFeed && status.ready
+      ? 'Connected'
+      : 'Client added';
   els.setupChip.className = `chip ${status.apiConfigured ? 'is-good' : 'is-warn'}`;
 
   els.openGmailButton.hidden = true;
@@ -112,7 +116,7 @@ function renderSource(status) {
     els.sourceChip.textContent = 'Needs setup';
     els.sourceChip.className = 'chip is-warn';
     els.sourceDetail.textContent =
-      'No OAuth client ID has been built in yet, so signing in is not possible. Work through the steps below.';
+      'This build does not contain an OAuth client ID yet. Complete steps 1–5 below, rebuild and reload, then use step 6 to connect.';
     els.primaryAction.textContent = 'Connect Gmail';
     els.primaryAction.disabled = true;
     return;
@@ -366,6 +370,10 @@ els.shortcutButton.addEventListener('click', () => {
   chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
 });
 
+$('open-extensions-button').addEventListener('click', () => {
+  chrome.tabs.create({ url: 'chrome://extensions' });
+});
+
 async function showShortcut() {
   try {
     const commands = await chrome.commands.getAll();
@@ -379,8 +387,156 @@ async function showShortcut() {
 }
 
 /* ------------------------------------------------------------------ *
+ * Animated setup walkthrough
+ * ------------------------------------------------------------------ */
+
+const TOUR_SCENE_MS = 6500;
+
+/**
+ * A small, self-contained player rather than a video: its labels stay crisp,
+ * it contains no account data, and every scene remains useful when motion is
+ * disabled. The textual checklist is still the source of truth.
+ */
+function setupTour() {
+  const root = $('setup-tour');
+  const scenes = [...root.querySelectorAll('[data-tour-scene]')];
+  const dots = [...root.querySelectorAll('[data-tour-index]')];
+  const jumpButtons = [...document.querySelectorAll('[data-tour-jump]')];
+  const location = $('tour-location');
+  const caption = $('tour-caption');
+  const announcer = $('tour-announcer');
+  const autoButton = $('tour-auto-button');
+  const motionButton = $('tour-play-button');
+  const previousButton = $('tour-prev-button');
+  const nextButton = $('tour-next-button');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  let current = 0;
+  let autoAdvance = !reducedMotion.matches;
+  let motionPaused = reducedMotion.matches;
+  let timer = null;
+
+  function clearTimer() {
+    if (timer !== null) window.clearTimeout(timer);
+    timer = null;
+  }
+
+  function scheduleNext() {
+    clearTimer();
+    if (!autoAdvance || document.hidden) return;
+    timer = window.setTimeout(() => showScene(current + 1), TOUR_SCENE_MS);
+  }
+
+  function paintAutoplay() {
+    autoButton.textContent = autoAdvance ? 'Pause autoplay' : 'Start autoplay';
+    autoButton.setAttribute(
+      'aria-label',
+      autoAdvance ? 'Pause automatic walkthrough steps' : 'Start automatic walkthrough steps',
+    );
+  }
+
+  function setAutoAdvance(next) {
+    autoAdvance = next;
+    paintAutoplay();
+    if (autoAdvance) scheduleNext();
+    else clearTimer();
+  }
+
+  function paintMotion() {
+    root.classList.toggle('is-paused', motionPaused);
+    if (reducedMotion.matches) {
+      motionButton.disabled = true;
+      motionButton.textContent = 'Motion off';
+      motionButton.setAttribute('aria-label', 'Motion is disabled by your system preference');
+      return;
+    }
+    motionButton.disabled = false;
+    motionButton.textContent = motionPaused ? 'Play motion' : 'Pause motion';
+    motionButton.setAttribute(
+      'aria-label',
+      motionPaused ? 'Play the illustration motion' : 'Pause the illustration motion',
+    );
+  }
+
+  /**
+   * @param {number} requested
+   * @param {{ scroll?: boolean, announce?: boolean }} [options]
+   */
+  function showScene(requested, options = {}) {
+    current = (requested + scenes.length) % scenes.length;
+    const active = scenes[current];
+
+    for (const scene of scenes) {
+      scene.classList.remove('is-active');
+      scene.hidden = scene !== active;
+    }
+    // Force a fresh animation timeline when a scene is replayed.
+    void active.offsetWidth;
+    active.classList.add('is-active');
+
+    dots.forEach((dot, index) => {
+      const selected = index === current;
+      dot.classList.toggle('is-current', selected);
+      dot.setAttribute('aria-pressed', String(selected));
+    });
+    location.textContent = active.dataset.tourLocation ?? '';
+    caption.textContent = active.dataset.tourCaption ?? '';
+
+    if (options.announce) {
+      announcer.textContent = '';
+      window.requestAnimationFrame(() => {
+        const stepLabel = dots[current].querySelector('span')?.textContent ?? String(current + 1);
+        announcer.textContent = `Walkthrough step ${stepLabel}. ${caption.textContent}`;
+      });
+    }
+    if (options.scroll) {
+      root.scrollIntoView({
+        behavior: reducedMotion.matches ? 'auto' : 'smooth',
+        block: 'center',
+      });
+    }
+    scheduleNext();
+  }
+
+  function showManualScene(requested, options = {}) {
+    setAutoAdvance(false);
+    showScene(requested, { ...options, announce: true });
+  }
+
+  autoButton.addEventListener('click', () => setAutoAdvance(!autoAdvance));
+  motionButton.addEventListener('click', () => {
+    if (reducedMotion.matches) return;
+    motionPaused = !motionPaused;
+    paintMotion();
+  });
+  previousButton.addEventListener('click', () => showManualScene(current - 1));
+  nextButton.addEventListener('click', () => showManualScene(current + 1));
+  dots.forEach((dot) => {
+    dot.addEventListener('click', () => showManualScene(Number(dot.dataset.tourIndex)));
+  });
+  jumpButtons.forEach((button) => {
+    button.addEventListener('click', () =>
+      showManualScene(Number(button.dataset.tourJump), { scroll: true }),
+    );
+  });
+
+  document.addEventListener('visibilitychange', scheduleNext);
+  reducedMotion.addEventListener?.('change', (event) => {
+    motionPaused = event.matches;
+    if (event.matches) setAutoAdvance(false);
+    paintMotion();
+  });
+
+  paintAutoplay();
+  paintMotion();
+  showScene(0);
+}
+
+/* ------------------------------------------------------------------ *
  * First paint
  * ------------------------------------------------------------------ */
+
+setupTour();
 
 (async () => {
   try {

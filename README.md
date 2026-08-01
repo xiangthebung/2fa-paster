@@ -64,10 +64,10 @@ Two honest limitations:
 
 ### Full messages (optional, one-time setup)
 
-The Gmail API over OAuth, reading whole message bodies. Finds codes the preview
-cannot reach, and lets you narrow the search with Gmail query syntax. The cost is
-a Google Cloud OAuth client of your own — free, about five minutes, and detailed
-below.
+The Gmail API over OAuth, reading whole message bodies. It finds codes the preview
+cannot reach and lets you narrow the search with Gmail query syntax. The tradeoff
+is a Google Cloud OAuth client of your own — free and usually 5–10 minutes to set
+up.
 
 Switch between the two on the options page. The popup also offers the upgrade at
 the moment it is actually relevant: after a search comes up empty.
@@ -77,44 +77,68 @@ the moment it is actually relevant: after a search comes up empty.
 ## Setting up full messages
 
 Only needed if you choose that reader. Google grants Gmail access to a registered
-application rather than to extensions in general, so you register one; it belongs
-to your Google account, with no third party in the middle. The options page walks
-through the same steps with the right links and your extension ID already filled
-in.
+application rather than to extensions in general, so you register one in a Cloud
+project you control. No third party sits in the middle. You never need to share or
+enter your Google password, a verification code, or a client secret.
 
-1. **Copy the extension ID.** `chrome://extensions` shows a 32-character ID under
-   the extension's name; the options page shows it with a copy button. An unpacked
-   extension's ID comes from its folder path, so it stays put as long as you do
-   not move the project — see [Pinning the extension ID](#pinning-the-extension-id)
-   if you need it to survive a move.
+The options page is the best place to follow this process: it includes a
+step-by-step animated walkthrough, direct links, your extension ID, success checks
+for every step, replay controls, and a reduced-motion mode.
 
-2. **Enable the Gmail API.**
-   [Create a project](https://console.cloud.google.com/projectcreate), then
-   [enable the Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com).
+1. **Copy the extension ID.** Use the copy button on the options page. Google uses
+   this exact 32-character value as the OAuth client's **Item ID**. An unpacked
+   extension's ID can change if you move its project folder, so finish the setup
+   before moving it — or see [Pinning the extension ID](#pinning-the-extension-id).
 
-3. **Configure the consent screen.** User type **External**, fill in an app name
-   and your email, and add your Google account under **Test users**.
+2. **Create a project and enable Gmail API.**
+   [Create or select a project](https://console.cloud.google.com/projectcreate),
+   open the [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com),
+   and click **Enable**. It is ready when that button changes to **Manage**.
 
-   Leave it in testing mode. Reading message bodies needs the `gmail.readonly`
-   scope, which Google classifies as *restricted*: publishing an app that requests
-   it requires verification and a third-party security assessment. In testing mode
-   the scope works normally for the accounts you list. Google will show an
-   "unverified app" warning the first time you connect — that is this situation,
-   not a fault.
+3. **Configure consent, audience, and access.** Under **Google Auth platform →
+   Branding**, click **Get started** if Google asks, enter `2FA Paster` as the app
+   name, and use your own support and contact email. Under
+   [Audience](https://console.cloud.google.com/auth/audience), choose **External**,
+   leave the publishing status at **Testing**, and add the exact Gmail address you
+   plan to connect under **Test users**. Then open
+   [Data Access](https://console.cloud.google.com/auth/scopes), choose **Add or
+   remove scopes**, select `https://www.googleapis.com/auth/gmail.readonly`, and
+   save. This is the only Gmail scope the extension requests.
 
-4. **Create the OAuth client.** **Clients** → **Create client** → application type
-   **Chrome Extension**, and paste the extension ID into **Item ID**. Copy the
-   client ID; it ends in `.apps.googleusercontent.com`.
+4. **Create the OAuth client.** Open
+   [Google Auth platform → Clients](https://console.cloud.google.com/auth/clients),
+   choose **Create client**, set the application type to **Chrome Extension**, name
+   it `2FA Paster`, and paste the extension ID from step 1 into **Item ID**. Copy
+   the generated client ID. It ends in `.apps.googleusercontent.com`; no client
+   secret is required.
 
-5. **Give it to the build.** Save it in `client-id.local` next to `package.json`:
+5. **Add the client ID and rebuild.** Create `client-id.local` beside
+   `package.json` — not inside `dist` — and put only the client ID on one line,
+   without quotes or JSON:
 
-   ```
+   ```text
    1234567890-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com
    ```
 
-   Then `npm run build` and reload the extension. The file is git-ignored and the
-   build writes the value into `dist/manifest.json`, so the committed manifest
-   keeps its placeholder. `GMAIL_CLIENT_ID` in the environment works too.
+   Then run:
+
+   ```powershell
+   npm run build
+   ```
+
+   The file is git-ignored. `GMAIL_CLIENT_ID` in the environment is also supported.
+
+6. **Reload and connect.** Open `chrome://extensions`, reload the 2FA Paster card
+   that was loaded from `dist`, return to the options page, and click **Connect
+   Gmail**. Select the same address you added as a test user. A personal app left
+   in Testing may be described as unverified; continue only after confirming that
+   the app name and Cloud project are the ones you just created. Setup is complete
+   when the options page says **Connected**.
+
+If **Connect Gmail** remains disabled, check that `client-id.local` is beside
+`package.json`, contains one client ID with no quotes, the build succeeded, the
+loaded extension points to `dist`, and the OAuth client's Item ID exactly matches
+the extension ID shown on the options page.
 
 ### Pinning the extension ID
 

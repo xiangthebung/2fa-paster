@@ -14,3 +14,10 @@ client-id.local
 extension-key.local
 
 .DS_Store
+
+# Working notes from an assistant session: timestamped review output and task
+# handoff documents. They describe how a change was made rather than what the
+# extension is, and they carry absolute paths from the machine they were written
+# on. No repository here tracks them.
+semantic-review/
+*_HANDOFF.md

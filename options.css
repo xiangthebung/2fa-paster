@@ -65,7 +65,14 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.page { display: grid; gap: 16px; max-width: 680px; margin: 0 auto; }
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  gap: 16px;
+  max-width: 680px;
+  margin: 0 auto;
+}
 
 h1 { margin: 0; font-size: 22px; font-weight: 680; letter-spacing: -.02em; }
 h2 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
@@ -120,12 +127,14 @@ code {
 
 .card {
   display: grid;
+  min-width: 0;
   gap: 12px;
   padding: 18px;
   border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: var(--shadow-card);
 }
+.card > * { min-width: 0; }
 .card-head { display: flex; align-items: center; gap: 10px; }
 .card-head h2 { flex: 1; }
 
@@ -202,8 +211,28 @@ code {
  * Steps
  * ----------------------------------------------------------------- */
 
-.steps { display: grid; gap: 18px; margin: 2px 0 0; padding: 0; counter-reset: step; list-style: none; }
-.steps > li { display: grid; gap: 6px; padding-left: 38px; position: relative; counter-increment: step; }
+/* minmax(0, ...) on both grids, because an `auto` track floors at its content's
+   min-content width. A step containing something unbreakable (the 32-character
+   extension ID) would otherwise widen its own track past the card and scroll the
+   whole page sideways on a narrow window. */
+.steps {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  margin: 2px 0 0;
+  padding: 0;
+  counter-reset: step;
+  list-style: none;
+}
+.steps > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  padding-left: 38px;
+  position: relative;
+  min-width: 0;
+  counter-increment: step;
+}
 .steps > li::before {
   position: absolute;
   top: 0;
@@ -244,6 +273,357 @@ code {
 .snippet code { padding: 0; background: none; color: inherit; font-size: 13px; }
 
 .plain-list { display: grid; gap: 8px; padding-left: 18px; color: var(--secondary); list-style: disc; }
+
+/* ----------------------------------------------------------------- *
+ * Full-message setup walkthrough
+ * ----------------------------------------------------------------- */
+
+.setup-note {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--separator));
+  border-radius: var(--radius-control);
+  background: var(--accent-soft);
+  color: var(--secondary);
+  font-size: 13px;
+}
+.setup-note strong { color: var(--text); font-size: 13px; }
+
+.setup-tour {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-card);
+  background: var(--surface-muted);
+}
+.tour-head { display: flex; align-items: flex-start; gap: 12px; }
+.tour-head > div:first-child { display: grid; flex: 1; gap: 2px; }
+.tour-head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.tour-play-button,
+.tour-nav-button,
+.step-watch-button {
+  border: 1px solid var(--separator);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent-text);
+  font-size: 12px;
+  font-weight: 640;
+}
+.tour-play-button { min-height: 30px; padding: 0 12px; white-space: nowrap; }
+.tour-nav-button { min-width: 54px; min-height: 30px; padding: 0 11px; }
+.step-watch-button { min-height: 27px; padding: 0 10px; white-space: nowrap; }
+.tour-play-button:hover,
+.tour-nav-button:hover,
+.step-watch-button:hover { background: var(--surface-hover); }
+
+.tour-viewport { display: grid; min-width: 0; gap: 9px; }
+.tour-browser {
+  overflow: hidden;
+  border: 1px solid rgba(60, 64, 67, .28);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(28, 30, 34, .13);
+  color: #202124;
+  user-select: none;
+}
+.tour-browser-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 34px;
+  padding: 0 11px;
+  border-bottom: 1px solid #dfe1e5;
+  background: #f1f3f4;
+  color: #5f6368;
+  font-size: 10px;
+}
+.tour-window-dots { display: flex; gap: 5px; }
+.tour-window-dots i { width: 7px; height: 7px; border-radius: 50%; background: #bdc1c6; }
+.tour-location {
+  min-width: 0;
+  overflow: hidden;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: #fff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tour-screen { position: relative; min-height: 300px; overflow: hidden; background: #f7f8fa; }
+.tour-scene { position: absolute; inset: 0; padding: 14px; }
+.tour-scene.is-active { animation: tour-scene-in .25s ease-out both; }
+.tour-caption { min-height: 2.9em; color: var(--secondary); font-size: 13px; line-height: 1.45; }
+
+.tour-controls { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 10px; }
+.tour-progress { display: flex; min-width: 0; align-items: center; justify-content: center; gap: 7px; }
+.tour-dot {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  border: 1px solid var(--separator);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--tertiary);
+  font-size: 11px;
+  font-weight: 680;
+}
+.tour-dot:hover { color: var(--accent-text); }
+.tour-dot.is-current {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* The dashboard illustrations are deliberately schematic: labels and control
+   hierarchy stay useful even when Google nudges spacing or iconography. */
+.mock-options-window,
+.mock-cloud-window,
+.mock-editor-window,
+.mock-finish-window {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid #dadce0;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(60, 64, 67, .12);
+  font-family: Arial, sans-serif;
+  font-size: 11px;
+}
+.mock-heading-row,
+.mock-cloud-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.mock-options-window { display: grid; align-content: center; gap: 18px; padding: 30px 42px; background: #f4f3f8; }
+.mock-heading-row strong { font-size: 16px; }
+.mock-chip {
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #fff2d7;
+  color: #7c4b00;
+  font-weight: 700;
+}
+.mock-copy-card { display: grid; gap: 7px; padding: 18px; border-radius: 10px; background: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, .09); }
+.mock-label,
+.mock-eyebrow { color: #5f6368; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.mock-copy-row { display: flex; align-items: center; gap: 8px; }
+.mock-copy-row code {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  padding: 8px;
+  border: 1px solid #dadce0;
+  background: #f8f9fa;
+  color: #3c4043;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mock-button {
+  display: inline-grid;
+  place-items: center;
+  min-height: 28px;
+  padding: 0 13px;
+  border: 1px solid #dadce0;
+  border-radius: 5px;
+  background: #fff;
+  color: #1a73e8;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.mock-button.mock-primary { border-color: #1a73e8; background: #1a73e8; color: #fff; }
+
+.mock-cloud-window { display: grid; grid-template-rows: 42px 1fr; }
+.mock-cloud-topbar { padding: 0 16px; border-bottom: 1px solid #dadce0; }
+.mock-cloud-topbar strong { color: #3c4043; font-size: 14px; }
+.mock-cloud-topbar > span,
+.mock-project { padding: 6px 10px; border: 1px solid #dadce0; border-radius: 5px; color: #3c4043; }
+.mock-cloud-body { display: grid; grid-template-columns: 120px 1fr; min-height: 0; }
+.mock-cloud-nav { display: grid; align-content: start; gap: 3px; padding: 12px 8px; border-right: 1px solid #e8eaed; background: #f8fafd; color: #5f6368; }
+.mock-cloud-nav strong { padding: 6px 7px; color: #3c4043; font-size: 10px; }
+.mock-cloud-nav span { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 6px 7px; border-radius: 5px; }
+.mock-cloud-nav .is-current { background: #d3e3fd; color: #0b57d0; font-weight: 700; }
+.mock-done { color: #188038; font-size: 8px; text-transform: uppercase; }
+.mock-cloud-main { position: relative; display: grid; align-content: start; gap: 13px; padding: 22px 24px; }
+.mock-api-title { display: flex; align-items: center; gap: 10px; }
+.mock-api-title > div { display: grid; gap: 2px; }
+.mock-api-title strong { font-size: 17px; }
+.mock-api-title small,
+.mock-cloud-main p,
+.mock-test-users small,
+.mock-scope-row small { color: #5f6368; }
+.mock-mail-mark,
+.mock-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #e8f0fe;
+  color: #1a73e8;
+  font-size: 16px;
+  font-weight: 800;
+}
+.mock-cloud-main > .mock-button { justify-self: start; }
+.mock-status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.mock-status-grid > span,
+.mock-test-users,
+.mock-scope-row { padding: 10px; border: 1px solid #dadce0; border-radius: 7px; }
+.mock-status-grid span { display: grid; gap: 3px; }
+.mock-status-grid small { color: #5f6368; }
+.mock-test-users,
+.mock-scope-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mock-test-users > div,
+.mock-scope-row > div { display: grid; gap: 3px; }
+.scene-audience .mock-cloud-main { gap: 8px; padding: 14px 18px; }
+.scene-audience .mock-status-grid > span,
+.scene-audience .mock-test-users { padding: 7px 9px; }
+.mock-access-panel { gap: 8px; padding: 14px 18px; }
+.mock-scope-dialog { display: grid; gap: 7px; padding: 9px; border: 1px solid #dadce0; border-radius: 7px; }
+.mock-search-field { padding: 6px 8px; border: 1px solid #dadce0; border-radius: 4px; color: #5f6368; }
+.mock-scope-choice { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 5px; background: #f8fafd; }
+.mock-scope-choice > div { display: grid; min-width: 0; gap: 1px; }
+.mock-scope-choice small { overflow: hidden; color: #5f6368; text-overflow: ellipsis; white-space: nowrap; }
+.mock-checkbox { display: grid; place-items: center; width: 16px; height: 16px; flex: 0 0 auto; border-radius: 3px; background: #1a73e8; color: #fff; font-size: 10px; }
+.mock-dialog-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; color: #5f6368; }
+.mock-dialog-actions .mock-button { min-height: 24px; padding: 0 10px; }
+.mock-access-panel > .mock-button { min-height: 24px; justify-self: end; padding: 0 11px; }
+
+.mock-client-form { gap: 9px; }
+.mock-client-form label { display: grid; gap: 3px; padding: 7px 9px; border: 1px solid #dadce0; border-radius: 5px; }
+.mock-client-form label span { color: #5f6368; font-size: 9px; }
+.mock-client-form label b { overflow: hidden; color: #3c4043; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.mock-client-form > .mock-button { margin-top: 2px; }
+
+.mock-editor-window { display: grid; grid-template-rows: 34px 1fr 104px; background: #1f1f24; color: #d8d8df; }
+.mock-editor-tabs { display: flex; align-items: stretch; background: #2b2b31; }
+.mock-editor-tabs span { display: grid; place-items: center; padding: 0 14px; border-right: 1px solid #3b3b43; color: #a9a9b3; }
+.mock-editor-tabs .is-current { border-top: 2px solid #8b7bff; background: #1f1f24; color: #fff; }
+.mock-editor-code { display: grid; grid-template-columns: 28px 1fr; align-content: start; padding: 22px 10px; font-family: Consolas, monospace; }
+.mock-editor-code b { color: #6f6f78; font-weight: 400; }
+.mock-editor-code code { overflow: hidden; padding: 0; background: transparent; color: #c3e88d; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.mock-terminal { display: grid; align-content: start; gap: 8px; padding: 9px 14px; border-top: 1px solid #3b3b43; background: #18181c; }
+.mock-terminal > span { color: #aaaab3; font-size: 8px; font-weight: 700; letter-spacing: .08em; }
+.mock-terminal code { padding: 0; background: transparent; color: #eeeef2; font-size: 10px; }
+.mock-terminal code:last-child { color: #72d997; }
+
+.mock-finish-window { display: grid; align-content: center; gap: 14px; padding: 26px 38px; background: #f1f3f4; }
+.mock-extension-card,
+.mock-connect-card { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid #dadce0; border-radius: 8px; background: #fff; box-shadow: 0 2px 7px rgba(60, 64, 67, .1); }
+.mock-extension-card > div,
+.mock-connect-card > div { display: grid; flex: 1; gap: 2px; }
+.mock-extension-card small,
+.mock-connect-card small { color: #5f6368; }
+.mock-reload { padding: 7px 9px; border-radius: 5px; color: #1a73e8; font-weight: 700; }
+.mock-flow-arrow { justify-self: center; color: #5f6368; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+
+.tour-secondary-target { box-shadow: inset 0 0 0 1px transparent; }
+.tour-pointer {
+  position: absolute;
+  z-index: 4;
+  width: 17px;
+  height: 23px;
+  background: #202124;
+  clip-path: polygon(0 0, 0 100%, 30% 72%, 46% 100%, 62% 91%, 47% 65%, 80% 65%);
+  filter: drop-shadow(0 1px 1px rgba(255, 255, 255, .8));
+  opacity: 0;
+}
+.scene-copy .tour-pointer { top: 57%; left: 82%; }
+.scene-api .tour-pointer { top: 61%; left: 83%; }
+.scene-audience .tour-pointer { top: 68%; left: 82%; }
+.scene-access .tour-pointer { top: 67%; left: 79%; }
+.scene-client .tour-pointer { top: 76%; left: 80%; }
+.scene-build .tour-pointer { top: 75%; left: 72%; background: #fff; filter: drop-shadow(0 1px 1px #000); }
+.scene-connect .tour-pointer { top: 35%; left: 80%; }
+.tour-success {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  z-index: 3;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #e6f4ea;
+  color: #137333;
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0;
+  box-shadow: 0 2px 8px rgba(19, 115, 51, .15);
+}
+
+.tour-scene.is-active .tour-target { animation: tour-target 5.8s ease-in-out infinite; }
+.tour-scene.is-active .tour-secondary-target { animation: tour-secondary-target 5.8s ease-in-out infinite; }
+.tour-scene.is-active .tour-target-late { animation: tour-target-late 5.8s ease-in-out infinite; }
+.tour-scene.is-active .tour-pointer { animation: tour-pointer-tap 5.8s ease-in-out infinite; }
+.tour-scene.is-active .tour-success { animation: tour-success 5.8s ease-in-out infinite; }
+.scene-connect.is-active .tour-pointer { animation-name: tour-pointer-two-actions; }
+.setup-tour.is-paused .tour-scene * { animation-play-state: paused !important; }
+.setup-tour.is-paused .tour-scene.is-active { animation: none; opacity: 1; transform: none; }
+
+@keyframes tour-scene-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes tour-target {
+  0%, 18%, 58%, 100% { box-shadow: 0 0 0 0 rgba(26, 115, 232, 0); transform: scale(1); }
+  28%, 44% { box-shadow: 0 0 0 5px rgba(26, 115, 232, .22); }
+  39% { transform: scale(.96); }
+}
+@keyframes tour-secondary-target {
+  0%, 12%, 54%, 100% { box-shadow: inset 0 0 0 1px transparent; }
+  22%, 42% { box-shadow: inset 0 0 0 2px #1a73e8, 0 0 0 4px rgba(26, 115, 232, .14); }
+}
+@keyframes tour-target-late {
+  0%, 48%, 94%, 100% { box-shadow: 0 0 0 0 rgba(26, 115, 232, 0); transform: scale(1); }
+  60%, 80% { box-shadow: 0 0 0 5px rgba(26, 115, 232, .22); }
+  73% { transform: scale(.96); }
+}
+@keyframes tour-pointer-tap {
+  0%, 12%, 57%, 100% { opacity: 0; transform: translate(20px, 16px) scale(1); }
+  22%, 46% { opacity: 1; transform: translate(0, 0) scale(1); }
+  38% { opacity: 1; transform: translate(0, 0) scale(.82); }
+}
+@keyframes tour-pointer-two-actions {
+  0%, 10%, 88%, 100% { opacity: 0; transform: translate(18px, 12px); }
+  18%, 38% { opacity: 1; transform: translate(0, 0); }
+  31% { opacity: 1; transform: translate(0, 0) scale(.82); }
+  48% { opacity: 0; transform: translate(-6px, 34px); }
+  58%, 80% { opacity: 1; transform: translate(-20px, 112px); }
+  72% { opacity: 1; transform: translate(-20px, 112px) scale(.82); }
+}
+@keyframes tour-success {
+  0%, 43%, 92%, 100% { opacity: 0; transform: translateY(5px); }
+  54%, 84% { opacity: 1; transform: translateY(0); }
+}
+
+.setup-checklist { gap: 0; margin-top: 0; }
+.setup-checklist > li { gap: 8px; padding: 18px 0 18px 38px; border-top: 1px solid var(--separator); }
+.setup-checklist > li::before { top: 18px; }
+.setup-checklist > li:first-child { padding-top: 2px; border-top: 0; }
+.setup-checklist > li:first-child::before { top: 2px; }
+.step-heading { display: flex; align-items: center; gap: 10px; }
+.step-heading h3 { flex: 1; }
+.step-watch-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.step-success {
+  padding: 8px 10px;
+  border-left: 3px solid var(--success-text);
+  border-radius: 0 6px 6px 0;
+  background: var(--success-soft);
+  color: var(--secondary);
+  font-size: 12px;
+}
+.step-success strong { color: var(--success-text); }
+.setup-checklist code { overflow-wrap: anywhere; word-break: break-word; }
+.setup-troubleshooting { padding-top: 12px; border-top: 1px solid var(--separator); }
+.setup-troubleshooting summary { color: var(--accent-text); cursor: pointer; font-size: 13px; font-weight: 650; }
+.setup-troubleshooting[open] summary { margin-bottom: 10px; }
 
 /* ----------------------------------------------------------------- *
  * Controls
@@ -299,9 +679,13 @@ code {
 .setting-row:first-of-type,
 .field-row:first-of-type { border-top: 0; }
 
-.option-copy { display: grid; gap: 2px; flex: 1; min-width: 220px; }
+/* minmax(0, ...) for the same reason as .steps: an `auto` track cannot go below
+   its content's min-content width, so a long example query would push this
+   label's text out over the control sitting next to it. */
+.option-copy { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; flex: 1; min-width: 220px; }
 .option-copy strong { font-size: 14px; font-weight: 620; }
 .option-copy small { color: var(--tertiary); font-size: 13px; line-height: 1.45; }
+.option-copy code { overflow-wrap: anywhere; }
 
 select,
 input[type="text"] {
@@ -360,3 +744,81 @@ input[type="text"] { flex: 1; min-width: 240px; }
 .status-message.is-error { color: var(--danger); }
 .status-message.is-good { color: var(--success-text); }
 .status-message.is-warn { color: var(--warn-text); }
+
+/* ----------------------------------------------------------------- *
+ * Narrow windows and reduced motion
+ *
+ * These come last on purpose. They override declarations from every section
+ * above, so keeping them at the end means plain single-class selectors are
+ * enough — no `.card select` specificity padding that a later base rule could
+ * silently undo. Add new base rules above this comment, not below it.
+ * ----------------------------------------------------------------- */
+
+@media (max-width: 560px) {
+  /* Settings controls: let them shrink instead of forcing the card wider than
+     the window. The base rules set generous min-widths for a roomy layout. */
+  .setting-row { gap: 10px; }
+  .option-copy { min-width: 0; }
+  input[type="text"] { width: 100%; min-width: 0; }
+  select { min-width: 0; max-width: 100%; }
+
+  /* A label and a full-width field side by side leaves both too narrow to read
+     here, so they stack. Switch rows stay side by side: a 44px switch fits. */
+  .field-row { align-items: stretch; flex-direction: column; gap: 8px; }
+
+  .tour-head { align-items: stretch; flex-direction: column; }
+  .tour-head-actions { justify-content: flex-start; }
+  .tour-play-button { align-self: start; }
+  .tour-screen { min-height: 330px; }
+  .tour-scene { padding: 8px; }
+  .mock-options-window { padding: 24px 18px; }
+  .mock-cloud-body { grid-template-columns: 88px 1fr; }
+  .mock-cloud-nav { padding: 8px 4px; font-size: 9px; }
+  .mock-cloud-nav span,
+  .mock-cloud-nav strong { padding: 5px 4px; }
+  .mock-cloud-main { gap: 10px; padding: 16px 12px; }
+  .mock-cloud-topbar { padding: 0 10px; }
+  .mock-cloud-topbar > span { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mock-status-grid { grid-template-columns: 1fr; }
+  .mock-test-users,
+  .mock-scope-row { align-items: stretch; flex-direction: column; }
+  .mock-test-users .mock-button,
+  .mock-scope-row .mock-button { align-self: start; }
+  .mock-finish-window { padding: 20px 16px; }
+  .tour-controls { align-items: stretch; flex-wrap: wrap; }
+  .tour-progress {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    order: -1;
+    width: 100%;
+    gap: 4px;
+  }
+  .tour-dot { width: 100%; max-width: 25px; height: auto; aspect-ratio: 1; justify-self: center; }
+  .tour-nav-button { min-width: 0; flex: 1 1 0; }
+  .step-heading { align-items: flex-start; flex-direction: column; }
+  .step-watch-actions { justify-content: flex-start; }
+
+  /* The extension ID has to be readable in full here, not ellipsized: the whole
+     point of step 1 is comparing it to the Item ID in the Cloud console. So the
+     one-line-with-ellipsis treatment gives way to wrapping. */
+  .copy-field { align-items: stretch; flex-direction: column; }
+  .copy-field .secondary-button { align-self: start; }
+  .copy-field code {
+    width: 100%;
+    min-width: 0;
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-scene,
+  .tour-scene *,
+  .card.is-dimmed,
+  .switch-track,
+  .switch-track::after { animation: none !important; transition: none !important; }
+  .tour-pointer { display: none; }
+  .tour-success { opacity: 1; transform: none; }
+}

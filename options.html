@@ -52,8 +52,8 @@
               <strong>Full messages <span class="tag">one-time setup</span></strong>
               <small>
                 Reads whole message bodies through the Gmail API, so it finds codes the
-                preview cannot reach. Needs a Google OAuth client ID of your own —
-                free, about five minutes, and the steps are below.
+                preview cannot reach. Needs a Google OAuth client ID of your own — free,
+                usually 5–10 minutes, with a visual walkthrough below.
               </small>
             </span>
           </label>
@@ -72,77 +72,392 @@
       <!-- Setup ----------------------------------------------------- -->
       <section id="setup-section" class="card" aria-labelledby="setup-title">
         <div class="card-head">
-          <h2 id="setup-title">Setting up full messages</h2>
-          <span id="setup-chip" class="chip">Not finished</span>
+          <h2 id="setup-title">Set up full messages</h2>
+          <span id="setup-chip" class="chip">Setup needed</span>
         </div>
         <p class="muted">
-          Only needed for the full-messages option. Google grants Gmail access to a
-          registered application rather than to extensions in general, so you register
-          one — it belongs to your Google account, and no third party sits in the middle.
+          Full messages uses the Gmail API to read beyond the inbox preview. Google
+          requires a private OAuth registration for that access. You create it in your
+          own Google Cloud project, and the extension talks directly to Google.
         </p>
 
-        <ol class="steps">
-          <li>
-            <h3>Copy this extension's ID</h3>
-            <p class="muted">Google ties the credential to this exact extension.</p>
+        <aside class="setup-note" aria-label="Before you start">
+          <strong>Before you start</strong>
+          <span>
+            Allow 5–10 minutes and keep this page, the project folder, and a terminal
+            open. You will copy IDs, but you will never enter or share your Google
+            password, a verification code, or a client secret.
+          </span>
+        </aside>
+
+        <div id="setup-tour" class="setup-tour" aria-labelledby="setup-tour-title">
+          <div class="tour-head">
+            <div>
+              <h3 id="setup-tour-title">Visual walkthrough</h3>
+              <p class="muted small">Sample data only. The labels match the current Google and Chrome screens.</p>
+            </div>
+            <div class="tour-head-actions">
+              <button id="tour-auto-button" class="tour-play-button" type="button">Pause autoplay</button>
+              <button id="tour-play-button" class="tour-play-button" type="button">Pause motion</button>
+            </div>
+          </div>
+
+          <div class="tour-viewport">
+            <div class="tour-browser" aria-hidden="true">
+              <div class="tour-browser-bar">
+                <span class="tour-window-dots"><i></i><i></i><i></i></span>
+                <span id="tour-location" class="tour-location">2FA Paster · Options</span>
+              </div>
+              <div class="tour-screen">
+                <div
+                  class="tour-scene scene-copy is-active"
+                  data-tour-scene="0"
+                  data-tour-location="2FA Paster · Options"
+                  data-tour-caption="Click Copy beside the extension ID. Keep this exact value for the OAuth client in step 4."
+                >
+                  <div class="mock-options-window">
+                    <div class="mock-heading-row">
+                      <strong>Set up full messages</strong>
+                      <span class="mock-chip">Setup needed</span>
+                    </div>
+                    <div class="mock-copy-card">
+                      <span class="mock-label">This extension's ID</span>
+                      <div class="mock-copy-row">
+                        <code>abcdefghijklmnopabcdefghijklmnop</code>
+                        <span class="mock-button mock-primary tour-target">Copy</span>
+                      </div>
+                    </div>
+                    <span class="tour-success">Extension ID copied</span>
+                    <span class="tour-pointer"></span>
+                  </div>
+                </div>
+
+                <div
+                  class="tour-scene scene-api"
+                  data-tour-scene="1"
+                  data-tour-location="console.cloud.google.com · Gmail API"
+                  data-tour-caption="Choose or create a project, open Gmail API, and click Enable. The button changes to Manage when it is ready."
+                  hidden
+                >
+                  <div class="mock-cloud-window">
+                    <div class="mock-cloud-topbar">
+                      <strong>Google Cloud</strong>
+                      <span class="mock-project">My 2FA project</span>
+                    </div>
+                    <div class="mock-cloud-body">
+                      <nav class="mock-cloud-nav">
+                        <strong>APIs &amp; Services</strong>
+                        <span class="is-current">Library</span>
+                        <span>Enabled APIs</span>
+                      </nav>
+                      <div class="mock-cloud-main">
+                        <span class="mock-eyebrow">API Library</span>
+                        <div class="mock-api-title">
+                          <span class="mock-mail-mark">M</span>
+                          <div><strong>Gmail API</strong><small>Google Workspace</small></div>
+                        </div>
+                        <p>View and manage Gmail mailbox data.</p>
+                        <span class="mock-button mock-primary tour-target">Enable</span>
+                        <span class="tour-success">API enabled · Manage</span>
+                      </div>
+                    </div>
+                    <span class="tour-pointer"></span>
+                  </div>
+                </div>
+
+                <div
+                  class="tour-scene scene-audience"
+                  data-tour-scene="2"
+                  data-tour-location="Google Auth platform · Audience"
+                  data-tour-caption="Choose External, keep the app in Testing, and add the Gmail address you will connect under Test users."
+                  hidden
+                >
+                  <div class="mock-cloud-window">
+                    <div class="mock-cloud-topbar"><strong>Google Auth platform</strong><span>My 2FA project</span></div>
+                    <div class="mock-cloud-body">
+                      <nav class="mock-cloud-nav">
+                        <span>Overview</span>
+                        <span>Branding <b class="mock-done">Done</b></span>
+                        <span class="is-current">Audience</span>
+                        <span>Data Access</span>
+                        <span>Clients</span>
+                      </nav>
+                      <div class="mock-cloud-main">
+                        <span class="mock-eyebrow">Audience</span>
+                        <div class="mock-status-grid">
+                          <span><small>User type</small><strong>External</strong></span>
+                          <span><small>Publishing status</small><strong>Testing</strong></span>
+                        </div>
+                        <div class="mock-test-users">
+                          <div><strong>Test users</strong><small>you@example.com</small></div>
+                          <span class="mock-button mock-primary tour-target">Add users</span>
+                        </div>
+                        <span class="tour-success">Test user saved</span>
+                      </div>
+                    </div>
+                    <span class="tour-pointer"></span>
+                  </div>
+                </div>
+
+                <div
+                  class="tour-scene scene-access"
+                  data-tour-scene="3"
+                  data-tour-location="Google Auth platform · Data Access"
+                  data-tour-caption="Click Add or remove scopes, select gmail.readonly, choose Update, and save the Data Access page."
+                  hidden
+                >
+                  <div class="mock-cloud-window">
+                    <div class="mock-cloud-topbar"><strong>Google Auth platform</strong><span>My 2FA project</span></div>
+                    <div class="mock-cloud-body">
+                      <nav class="mock-cloud-nav">
+                        <span>Overview</span>
+                        <span>Branding</span>
+                        <span>Audience</span>
+                        <span class="is-current">Data Access</span>
+                        <span>Clients</span>
+                      </nav>
+                      <div class="mock-cloud-main mock-access-panel">
+                        <span class="mock-eyebrow">Data Access</span>
+                        <div class="mock-scope-dialog">
+                          <strong>Add or remove scopes</strong>
+                          <span class="mock-search-field">Filter: gmail.readonly</span>
+                          <div class="mock-scope-choice tour-secondary-target">
+                            <span class="mock-checkbox">✓</span>
+                            <div><b>Gmail API</b><small>…/auth/gmail.readonly</small></div>
+                          </div>
+                          <div class="mock-dialog-actions">
+                            <span>Cancel</span>
+                            <span class="mock-button mock-primary tour-target">Update</span>
+                          </div>
+                        </div>
+                        <span class="mock-button mock-primary tour-target-late">Save</span>
+                        <span class="tour-success">gmail.readonly saved</span>
+                      </div>
+                    </div>
+                    <span class="tour-pointer"></span>
+                  </div>
+                </div>
+
+                <div
+                  class="tour-scene scene-client"
+                  data-tour-scene="4"
+                  data-tour-location="Google Auth platform · Clients"
+                  data-tour-caption="Create a Chrome Extension client. Paste the extension ID from step 1 into Item ID, then copy the new client ID."
+                  hidden
+                >
+                  <div class="mock-cloud-window">
+                    <div class="mock-cloud-topbar"><strong>Google Auth platform</strong><span>My 2FA project</span></div>
+                    <div class="mock-cloud-body">
+                      <nav class="mock-cloud-nav">
+                        <span>Branding</span><span>Audience</span><span>Data Access</span><span class="is-current">Clients</span>
+                      </nav>
+                      <div class="mock-cloud-main mock-client-form">
+                        <span class="mock-eyebrow">Create OAuth client</span>
+                        <label><span>Application type</span><b>Chrome Extension</b></label>
+                        <label><span>Name</span><b>2FA Paster</b></label>
+                        <label class="tour-secondary-target"><span>Item ID</span><b>abcdefghijklmnop…</b></label>
+                        <span class="mock-button mock-primary tour-target">Create</span>
+                        <span class="tour-success">Client ID created</span>
+                      </div>
+                    </div>
+                    <span class="tour-pointer"></span>
+                  </div>
+                </div>
+
+                <div
+                  class="tour-scene scene-build"
+                  data-tour-scene="5"
+                  data-tour-location="2fa paster · client-id.local"
+                  data-tour-caption="Put only the client ID in client-id.local beside package.json, then run npm run build. Do not add quotes or JSON."
+                  hidden
+                >
+                  <div class="mock-editor-window">
+                    <div class="mock-editor-tabs"><span class="is-current">client-id.local</span><span>package.json</span></div>
+                    <div class="mock-editor-code"><b>1</b><code>1234567890-example.apps.googleusercontent.com</code></div>
+                    <div class="mock-terminal">
+                      <span>TERMINAL</span>
+                      <code class="tour-target">PS C:\…\2fa paster&gt; npm run build</code>
+                      <code>&gt; Built dist/</code>
+                    </div>
+                    <span class="tour-success">Build complete</span>
+                    <span class="tour-pointer"></span>
+                  </div>
+                </div>
+
+                <div
+                  class="tour-scene scene-connect"
+                  data-tour-scene="6"
+                  data-tour-location="chrome://extensions · 2FA Paster"
+                  data-tour-caption="Reload 2FA Paster, return to this page, and click Connect Gmail using the same account you added as a test user."
+                  hidden
+                >
+                  <div class="mock-finish-window">
+                    <div class="mock-extension-card">
+                      <span class="mock-icon">2</span>
+                      <div><strong>2FA Paster</strong><small>Loaded from dist</small></div>
+                      <span class="mock-reload tour-target">Reload</span>
+                    </div>
+                    <span class="mock-flow-arrow">Then return to Options</span>
+                    <div class="mock-connect-card">
+                      <div><strong>Full messages</strong><small>Ready to connect</small></div>
+                      <span class="mock-button mock-primary tour-target-late">Connect Gmail</span>
+                    </div>
+                    <span class="tour-success">Connected</span>
+                    <span class="tour-pointer"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p id="tour-caption" class="tour-caption">
+              Click Copy beside the extension ID. Keep this exact value for the OAuth client in step 4.
+            </p>
+            <p id="tour-announcer" class="visually-hidden" aria-live="polite"></p>
+          </div>
+
+          <div class="tour-controls">
+            <button id="tour-prev-button" class="tour-nav-button" type="button">Back</button>
+            <div class="tour-progress" aria-label="Choose a walkthrough step">
+              <button class="tour-dot is-current" type="button" data-tour-index="0" aria-pressed="true"><span>1</span><span class="visually-hidden">Copy extension ID</span></button>
+              <button class="tour-dot" type="button" data-tour-index="1" aria-pressed="false"><span>2</span><span class="visually-hidden">Enable Gmail API</span></button>
+              <button class="tour-dot" type="button" data-tour-index="2" aria-pressed="false"><span>3a</span><span class="visually-hidden">Configure audience</span></button>
+              <button class="tour-dot" type="button" data-tour-index="3" aria-pressed="false"><span>3b</span><span class="visually-hidden">Add Gmail data access</span></button>
+              <button class="tour-dot" type="button" data-tour-index="4" aria-pressed="false"><span>4</span><span class="visually-hidden">Create OAuth client</span></button>
+              <button class="tour-dot" type="button" data-tour-index="5" aria-pressed="false"><span>5</span><span class="visually-hidden">Build extension</span></button>
+              <button class="tour-dot" type="button" data-tour-index="6" aria-pressed="false"><span>6</span><span class="visually-hidden">Reload and connect</span></button>
+            </div>
+            <button id="tour-next-button" class="tour-nav-button" type="button">Next</button>
+          </div>
+        </div>
+
+        <ol class="steps setup-checklist">
+          <li id="setup-step-1">
+            <div class="step-heading">
+              <h3>Copy this extension's ID</h3>
+              <button class="step-watch-button" type="button" data-tour-jump="0" aria-controls="setup-tour">Watch this step</button>
+            </div>
+            <p class="muted">
+              Click <strong>Copy</strong> below. Google uses this exact 32-character value
+              to tie the OAuth client to this installed extension.
+            </p>
             <div class="copy-field">
               <code id="extension-id">…</code>
               <button id="copy-id-button" class="secondary-button" type="button">Copy</button>
             </div>
+            <p class="step-success"><strong>Success looks like:</strong> “Extension ID copied” appears above.</p>
+            <p class="muted small">Do not move the project folder after this; Chrome can assign a moved unpacked extension a different ID.</p>
           </li>
 
-          <li>
-            <h3>Turn on the Gmail API</h3>
+          <li id="setup-step-2">
+            <div class="step-heading">
+              <h3>Create a project and enable Gmail API</h3>
+              <button class="step-watch-button" type="button" data-tour-jump="1" aria-controls="setup-tour">Watch this step</button>
+            </div>
             <p class="muted">
-              Create a Google Cloud project if you do not have one, then enable the Gmail
-              API for it.
+              Create a Google Cloud project, or select one you control. Open the Gmail
+              API page for that project and click <strong>Enable</strong>.
             </p>
             <p class="links">
-              <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noreferrer">New project</a>
-              <a href="https://console.cloud.google.com/apis/library/gmail.googleapis.com" target="_blank" rel="noreferrer">Enable Gmail API</a>
+              <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noreferrer">1. Create project</a>
+              <a href="https://console.cloud.google.com/apis/library/gmail.googleapis.com" target="_blank" rel="noreferrer">2. Open Gmail API</a>
             </p>
+            <p class="step-success"><strong>Success looks like:</strong> the Gmail API page shows <strong>Manage</strong> instead of Enable.</p>
           </li>
 
-          <li>
-            <h3>Set up the consent screen</h3>
+          <li id="setup-step-3">
+            <div class="step-heading">
+              <h3>Configure consent, audience, and access</h3>
+              <div class="step-watch-actions">
+                <button class="step-watch-button" type="button" data-tour-jump="2" aria-controls="setup-tour">Watch Audience</button>
+                <button class="step-watch-button" type="button" data-tour-jump="3" aria-controls="setup-tour">Watch Data Access</button>
+              </div>
+            </div>
             <p class="muted">
-              Choose <strong>External</strong>, fill in the app name and your own email,
-              then add your Google account under <strong>Test users</strong>. Leave it in
-              testing mode: reading message bodies needs a scope Google restricts, so a
-              published app would need a security review. In testing mode it works for
-              the accounts you list, which is all you need.
+              In <strong>Branding</strong>, click <strong>Get started</strong> if asked,
+              use “2FA Paster” as the app name, and enter your own support and contact
+              email. In <strong>Audience</strong>, choose <strong>External</strong>, keep
+              the publishing status at <strong>Testing</strong>, and add the exact Gmail
+              address you will connect under <strong>Test users</strong>.
+            </p>
+            <p class="muted small">
+              In <strong>Data Access</strong>, click <strong>Add or remove scopes</strong>,
+              search for <code>https://www.googleapis.com/auth/gmail.readonly</code>,
+              select it, and save. This is the one Gmail permission the extension asks
+              Google for; keeping the app in Testing avoids the public-app verification
+              process.
             </p>
             <p class="links">
-              <a href="https://console.cloud.google.com/auth/audience" target="_blank" rel="noreferrer">Audience and test users</a>
+              <a href="https://console.cloud.google.com/auth/branding" target="_blank" rel="noreferrer">1. Branding</a>
+              <a href="https://console.cloud.google.com/auth/audience" target="_blank" rel="noreferrer">2. Audience and test users</a>
+              <a href="https://console.cloud.google.com/auth/scopes" target="_blank" rel="noreferrer">3. Data Access</a>
             </p>
+            <p class="step-success"><strong>Success looks like:</strong> Audience shows <strong>External</strong>, <strong>Testing</strong>, and your test user; Data Access lists <code>gmail.readonly</code>.</p>
           </li>
 
-          <li>
-            <h3>Create the OAuth client</h3>
+          <li id="setup-step-4">
+            <div class="step-heading">
+              <h3>Create a Chrome Extension OAuth client</h3>
+              <button class="step-watch-button" type="button" data-tour-jump="4" aria-controls="setup-tour">Watch this step</button>
+            </div>
             <p class="muted">
-              Under <strong>Clients</strong>, choose <strong>Create client</strong>, pick
-              application type <strong>Chrome Extension</strong>, and paste the ID from
-              step 1 into <strong>Item ID</strong>. Copy the client ID it gives you — it
-              ends in <code>.apps.googleusercontent.com</code>.
+              In <strong>Clients</strong>, click <strong>Create client</strong>. Choose
+              application type <strong>Chrome Extension</strong>, name it “2FA Paster,”
+              and paste the extension ID from step 1 into <strong>Item ID</strong>.
+              Click Create, then copy the client ID Google returns.
             </p>
             <p class="links">
-              <a href="https://console.cloud.google.com/auth/clients" target="_blank" rel="noreferrer">Clients</a>
+              <a href="https://console.cloud.google.com/auth/clients" target="_blank" rel="noreferrer">Open Clients</a>
             </p>
+            <p class="step-success"><strong>Success looks like:</strong> the copied value ends in <code>.apps.googleusercontent.com</code>. No client secret is needed.</p>
           </li>
 
-          <li>
-            <h3>Give the client ID to the extension</h3>
+          <li id="setup-step-5">
+            <div class="step-heading">
+              <h3>Add the client ID and rebuild</h3>
+              <button class="step-watch-button" type="button" data-tour-jump="5" aria-controls="setup-tour">Watch this step</button>
+            </div>
             <p class="muted">
-              Save it in a file called <code>client-id.local</code> beside
-              <code>package.json</code>, then rebuild and reload. The file is git-ignored,
-              so the credential stays out of the repository.
+              In the folder containing <code>package.json</code>, create
+              <code>client-id.local</code>. Paste only the client ID on one line — no
+              quotes, label, or JSON — then save the file and run:
             </p>
             <pre class="snippet"><code>npm run build</code></pre>
-            <p class="muted small">
-              Then open <code>chrome://extensions</code> and press reload on 2FA Paster.
+            <p class="step-success"><strong>Success looks like:</strong> the command finishes without an error and refreshes the <code>dist</code> folder.</p>
+            <p class="muted small"><code>client-id.local</code> is git-ignored and is not copied into the repository.</p>
+          </li>
+
+          <li id="setup-step-6">
+            <div class="step-heading">
+              <h3>Reload, connect, and confirm</h3>
+              <button class="step-watch-button" type="button" data-tour-jump="6" aria-controls="setup-tour">Watch this step</button>
+            </div>
+            <p class="muted">
+              Open Chrome's extensions page and click reload on the 2FA Paster card.
+              Make sure that card was loaded from <code>dist</code>. Return here, refresh
+              this tab if needed, and click <strong>Connect Gmail</strong> near the top.
+              Choose the same account you added as a test user.
             </p>
+            <div class="row-actions">
+              <button id="open-extensions-button" class="secondary-button" type="button">Open Chrome extensions</button>
+            </div>
+            <p class="muted small">
+              Google may describe your personal testing app as unverified. Continue only
+              after confirming the app name and Google Cloud project are the ones you
+              just created.
+            </p>
+            <p class="step-success"><strong>Success looks like:</strong> the status at the top of this page says <strong>Connected</strong>.</p>
           </li>
         </ol>
+
+        <details class="setup-troubleshooting">
+          <summary>Connect Gmail is still disabled</summary>
+          <ul class="plain-list">
+            <li>Confirm <code>client-id.local</code> is beside <code>package.json</code>, not inside <code>dist</code>.</li>
+            <li>Confirm it contains one client ID ending in <code>.apps.googleusercontent.com</code>, with no quotes.</li>
+            <li>Run <code>npm run build</code>, then reload the extension that was loaded from <code>dist</code>.</li>
+            <li>Confirm the OAuth client's Item ID exactly matches the extension ID shown in step 1.</li>
+            <li>If Google blocks consent, confirm the selected account is a Test user and Data Access lists <code>gmail.readonly</code>.</li>
+          </ul>
+        </details>
       </section>
 
       <!-- Behaviour ------------------------------------------------- -->

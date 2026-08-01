@@ -283,13 +283,13 @@ function blocker(status) {
 
   if (!status.apiConfigured) {
     return {
-      title: 'Finish the full-text setup',
+      title: 'Set up full messages',
       body:
-        'Reading whole messages goes through the Gmail API, which needs a Google OAuth client ID of your own. ' +
-        'The setup page walks through it, or you can switch back to the no-setup reader.',
-      action: 'Open setup guide',
+        'Reading whole messages uses the Gmail API and a Google OAuth client ID that belongs to you. ' +
+        'The setup page has a six-step animated walkthrough, or you can keep using the no-setup inbox preview.',
+      action: 'Open visual setup guide',
       run: () => chrome.runtime.openOptionsPage(),
-      alt: 'Use the no-setup reader',
+      alt: 'Keep using inbox preview',
       runAlt: async () => {
         const response = await send('settings', { patch: { source: 'feed' } });
         if (response.ok) await refreshStatus();
