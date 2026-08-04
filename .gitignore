@@ -1,27 +1,53 @@
-node_modules/
-
-# Build output. Assembled by `npm run build`; load this in Chrome.
+```gitignore
+# Compiled and build artifacts
+*.pyc
+__pycache__/
+*.o
+*.obj
 dist/
+build/
+target/
 
-# Store upload artifacts, produced by `npm run zip`.
-artifacts/
-*.zip
+# Dependencies
+.venv/
+venv/
+node_modules/
+.julia/
+.zig-cache/
+zig-cache/
 
-# Your Google OAuth client ID and your pinned extension key. These identify
-# *your* Cloud project, so they stay out of the repository. The build reads them
-# and writes them into dist/manifest.json. See README.md -> Setup.
-client-id.local
-extension-key.local
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*.swo
 
+# Environment
+.env
+.env.local
+.env.*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# System files
 .DS_Store
+Thumbs.db
 
-# Everything written for an assistant rather than for the project: the running
-# notes in ai/NOTES.md, the standing instructions in ai/README.md, task handoffs,
-# review passes, and whatever throwaway probes a session leaves behind. None of it
-# is reviewed, none of it should be, and it carries absolute paths and dates from
-# whichever machine it was written on.
-#
-# What belongs in the repository instead: anything true about the *extension*
-# rather than about the work of changing it. Put that in a comment beside the code,
-# or in README.md if a user needs it.
-ai/
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Gradle
+.gradle/
+
+# MyPy
+.mypy_cache/
+
+# Pytest
+.pytest_cache/
+```

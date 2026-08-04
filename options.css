@@ -625,6 +625,37 @@ code {
 .setup-troubleshooting summary { color: var(--accent-text); cursor: pointer; font-size: 13px; font-weight: 650; }
 .setup-troubleshooting[open] summary { margin-bottom: 10px; }
 
+/* Advanced settings disclosure in behaviour section */
+.advanced-settings {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--separator);
+}
+.advanced-settings > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  cursor: pointer;
+  list-style: none;
+  color: var(--secondary);
+  font-size: 13px;
+  font-weight: 620;
+}
+.advanced-settings > summary::-webkit-details-marker { display: none; }
+.advanced-settings .disclosure-chevron {
+  width: 7px;
+  height: 7px;
+  border-right: 1.6px solid var(--tertiary);
+  border-bottom: 1.6px solid var(--tertiary);
+  transform: rotate(45deg);
+  transition: transform .15s ease;
+}
+.advanced-settings[open] .disclosure-chevron { transform: rotate(-135deg); }
+.advanced-settings .setting-row {
+  margin-top: 8px;
+}
+
 /* ----------------------------------------------------------------- *
  * Controls
  * ----------------------------------------------------------------- */

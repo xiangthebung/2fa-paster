@@ -338,6 +338,22 @@ svg { display: block; fill: none; stroke: currentColor; stroke-linecap: round; s
 .primary-button-tall { min-height: 44px; font-size: 14px; }
 .primary-button.is-busy { background: var(--accent-press); }
 
+/* Loading spinner for busy state */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, .3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+}
+
 .secondary-button {
   min-height: 34px;
   padding: 0 12px;
