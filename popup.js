@@ -27,6 +27,7 @@ const els = {
   targetField: $('target-field'),
   pasteButton: $('paste-button'),
   pasteLabel: $('paste-label'),
+  pasteSpinner: $('#paste-button .spinner'),
   codeCard: $('code-card'),
   codeValue: $('code-value'),
   codeSource: $('code-source'),
@@ -204,8 +205,14 @@ function renderHistory(entries) {
   // The list is rebuilt wholesale, so it is only rebuilt when something in it
   // changed. Polling every two seconds through `replaceChildren` would otherwise
   // pull the rows out from under a click, and reset any row being hovered.
+  // Use absolute timestamps (rounded to minutes) in the signature — not formatted
+  // age strings — so the signature stays stable within each minute and does not
+  // rebuild mid-hover when the text changes from "1 min ago" to "2 min ago".
   const signature = rows
-    .map((entry) => [entry.code, entry.site, entry.filled, entry.submitted, coarseAge(entry.receivedAt)].join(':'))
+    .map((entry) => {
+      const minutes = Math.floor(Math.max(0, Date.now() - entry.receivedAt) / 60000);
+      return [entry.code, entry.site, entry.filled, entry.submitted, entry.receivedAt, minutes].join(':');
+    })
     .join('|');
   if (signature === historyPainted) return;
   historyPainted = signature;
@@ -405,12 +412,21 @@ async function busy(button, busyText, work, labelEl = button) {
   const original = labelEl.textContent;
   button.disabled = true;
   button.classList.add('is-busy');
-  labelEl.textContent = busyText;
+  // Show spinner if available (for paste button), otherwise just change text
+  if (els.pasteSpinner && button === els.pasteButton) {
+    els.pasteSpinner.hidden = false;
+    labelEl.textContent = 'Looking…';
+  } else {
+    labelEl.textContent = busyText;
+  }
   try {
     return await work();
   } finally {
     button.disabled = false;
     button.classList.remove('is-busy');
+    if (els.pasteSpinner && button === els.pasteButton) {
+      els.pasteSpinner.hidden = true;
+    }
     labelEl.textContent = original;
   }
 }

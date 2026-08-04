@@ -479,43 +479,16 @@
         </div>
 
         <div class="setting-row">
-          <label class="option-copy" for="auto-copy">
-            <strong>Also copy to the clipboard</strong>
-            <small>So you can paste it yourself if the page will not take a typed value</small>
-          </label>
-          <span class="switch">
-            <input id="auto-copy" type="checkbox">
-            <span class="switch-track" aria-hidden="true"></span>
-          </span>
-        </div>
-
-        <div class="setting-row">
           <label class="option-copy" for="auto-submit">
             <strong>Submit the form after filling</strong>
             <small>
               Presses the form's own button when it can name one, and Enter when
-              there is no form to press. It will not press anything that reads like
-              "Resend", "Cancel" or "Try another way". Turn it off if you would
-              rather look at the code before it is used.
+              there is no form to press. Turn it off if you would rather look at
+              the code before it is used.
             </small>
           </label>
           <span class="switch">
             <input id="auto-submit" type="checkbox">
-            <span class="switch-track" aria-hidden="true"></span>
-          </span>
-        </div>
-
-        <div class="setting-row">
-          <label class="option-copy" for="in-page-toast">
-            <strong>Confirm it on the page</strong>
-            <small>
-              A small card in the corner of the page saying a code went in, so an
-              automatic fill never looks like the page acting on its own. Never
-              shows the code itself.
-            </small>
-          </label>
-          <span class="switch">
-            <input id="in-page-toast" type="checkbox">
             <span class="switch-track" aria-hidden="true"></span>
           </span>
         </div>
@@ -552,32 +525,65 @@
           </select>
         </div>
 
-        <div class="setting-row">
-          <label class="option-copy" for="freshness">
-            <strong>Ignore codes older than</strong>
-            <small>A code that has already expired is worse than none at all</small>
-          </label>
-          <select id="freshness">
-            <option value="5">5 minutes</option>
-            <option value="10">10 minutes</option>
-            <option value="20">20 minutes</option>
-            <option value="30">30 minutes</option>
-            <option value="60">1 hour</option>
-          </select>
-        </div>
+        <details class="advanced-settings">
+          <summary>
+            <span class="disclosure-label">Advanced options</span>
+            <span class="disclosure-chevron" aria-hidden="true"></span>
+          </summary>
+          
+          <div class="setting-row">
+            <label class="option-copy" for="auto-copy">
+              <strong>Also copy to the clipboard</strong>
+              <small>So you can paste it yourself if the page will not take a typed value</small>
+            </label>
+            <span class="switch">
+              <input id="auto-copy" type="checkbox">
+              <span class="switch-track" aria-hidden="true"></span>
+            </span>
+          </div>
 
-        <div class="setting-row">
-          <label class="option-copy" for="clipboard-clear">
-            <strong>Wipe the clipboard after</strong>
-            <small>Overwrites the copied code so it is not left lying around</small>
-          </label>
-          <select id="clipboard-clear">
-            <option value="0">Never</option>
-            <option value="30">30 seconds</option>
-            <option value="60">1 minute</option>
-            <option value="300">5 minutes</option>
-          </select>
-        </div>
+          <div class="setting-row">
+            <label class="option-copy" for="in-page-toast">
+              <strong>Confirm it on the page</strong>
+              <small>
+                A small card in the corner of the page saying a code went in, so an
+                automatic fill never looks like the page acting on its own. Never
+                shows the code itself.
+              </small>
+            </label>
+            <span class="switch">
+              <input id="in-page-toast" type="checkbox">
+              <span class="switch-track" aria-hidden="true"></span>
+            </span>
+          </div>
+
+          <div class="setting-row">
+            <label class="option-copy" for="freshness">
+              <strong>Ignore codes older than</strong>
+              <small>A code that has already expired is worse than none at all</small>
+            </label>
+            <select id="freshness">
+              <option value="5">5 minutes</option>
+              <option value="10">10 minutes</option>
+              <option value="20">20 minutes</option>
+              <option value="30">30 minutes</option>
+              <option value="60">1 hour</option>
+            </select>
+          </div>
+
+          <div class="setting-row">
+            <label class="option-copy" for="clipboard-clear">
+              <strong>Wipe the clipboard after</strong>
+              <small>Overwrites the copied code so it is not left lying around</small>
+            </label>
+            <select id="clipboard-clear">
+              <option value="0">Never</option>
+              <option value="30">30 seconds</option>
+              <option value="60">1 minute</option>
+              <option value="300">5 minutes</option>
+            </select>
+          </div>
+        </details>
       </section>
 
       <!-- Searching ------------------------------------------------- -->
