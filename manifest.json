@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "2FA Paster — codes from Gmail",
   "short_name": "2FA Paster",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Pulls the newest two-factor code out of your Gmail and drops it into the page, or onto your clipboard.",
   "minimum_chrome_version": "116",
 
