@@ -1,0 +1,11 @@
+<!doctype html>
+<!-- The ordinary case: one labelled code box and one submit button. -->
+<meta charset="utf-8">
+<title>Sign in</title>
+<h1>Enter your verification code</h1>
+<form id="form" onsubmit="event.preventDefault(); window.__submitted = true;">
+  <label for="code">Verification code</label>
+  <input id="code" name="otp" type="text" autocomplete="one-time-code" maxlength="6" inputmode="numeric">
+  <button type="submit" onclick="(window.__clicked = window.__clicked || []).push('Verify')">Verify</button>
+</form>
+<script src="/content.js"></script>

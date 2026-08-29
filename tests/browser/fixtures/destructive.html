@@ -1,0 +1,22 @@
+<!doctype html>
+<!--
+  A code form whose only buttons are ones nobody should press on your behalf.
+
+  "Confirm account deletion" is the worst case in one button: it reads exactly
+  like the button that finishes a code step, and pressing it is unrecoverable.
+  Wording alone cannot be trusted to identify a submit button, which is why the
+  never-press list is checked first and against every candidate.
+-->
+<meta charset="utf-8">
+<title>Account</title>
+<h1>Confirm with your security code</h1>
+<form id="form" onsubmit="event.preventDefault(); window.__submitted = true;">
+  <label for="code">Security code</label>
+  <input id="code" name="otp" type="text" autocomplete="one-time-code" maxlength="6">
+  <button type="button" onclick="(window.__clicked = window.__clicked || []).push('Confirm account deletion')">Confirm account deletion</button>
+  <button type="button" onclick="(window.__clicked = window.__clicked || []).push('Confirm removal of this device')">Confirm removal of this device</button>
+  <button type="button" onclick="(window.__clicked = window.__clicked || []).push('Revoke access and continue')">Revoke access and continue</button>
+  <button type="button" onclick="(window.__clicked = window.__clicked || []).push('Cancel')">Cancel</button>
+  <button type="button" onclick="(window.__clicked = window.__clicked || []).push('Resend code')">Resend code</button>
+</form>
+<script src="/content.js"></script>

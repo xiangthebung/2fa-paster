@@ -1,0 +1,16 @@
+<!doctype html>
+<!--
+  A delivery form that says "code" everywhere. The field itself is a postcode,
+  and the surrounding copy is exactly the sort that would score it up if the copy
+  were allowed to qualify a field on its own.
+-->
+<meta charset="utf-8">
+<title>Delivery</title>
+<h1>Where should we send it?</h1>
+<p>Enter the code for your area so we can verify delivery.</p>
+<form id="form" onsubmit="event.preventDefault(); window.__submitted = true;">
+  <label for="zip">Zip code</label>
+  <input id="zip" name="zipcode" type="text" maxlength="5" inputmode="numeric">
+  <button type="submit">Continue</button>
+</form>
+<script src="/content.js"></script>

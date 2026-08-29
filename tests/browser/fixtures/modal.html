@@ -1,0 +1,15 @@
+<!doctype html>
+<!-- A code box with no form around it, handling the Enter key itself. -->
+<meta charset="utf-8">
+<title>Verify</title>
+<h1>Two-step verification</h1>
+<div class="modal">
+  <label for="code">One-time code</label>
+  <input id="code" name="otp" type="text" autocomplete="one-time-code" maxlength="6">
+</div>
+<script>
+  document.getElementById('code').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') window.__enter = true;
+  });
+</script>
+<script src="/content.js"></script>

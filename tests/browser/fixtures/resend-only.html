@@ -1,0 +1,16 @@
+<!doctype html>
+<!--
+  One button, declared `type="submit"`, and it is the one button that must not be
+  pressed. This is the fallback path: a declared submit button whose wording is
+  not recognised is remembered and pressed when nothing better turns up, which is
+  right for an unlabelled button and wrong for this one.
+-->
+<meta charset="utf-8">
+<title>Check your email</title>
+<h1>Enter the code we sent you</h1>
+<form id="form" onsubmit="event.preventDefault(); window.__submitted = true;">
+  <label for="code">Verification code</label>
+  <input id="code" name="otp" type="text" autocomplete="one-time-code" maxlength="6">
+  <button type="submit" onclick="(window.__clicked = window.__clicked || []).push('Resend code')">Resend code</button>
+</form>
+<script src="/content.js"></script>

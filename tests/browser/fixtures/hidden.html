@@ -1,0 +1,18 @@
+<!doctype html>
+<!--
+  The code box exists but is not on screen, which is the state a multi-step login
+  is in before the password has been submitted.
+-->
+<meta charset="utf-8">
+<title>Sign in</title>
+<h1>Sign in</h1>
+<form id="form" onsubmit="event.preventDefault(); window.__submitted = true;">
+  <label for="user">Email</label>
+  <input id="user" name="username" type="text" autocomplete="username">
+  <div id="step2" style="display: none">
+    <label for="code">Verification code</label>
+    <input id="code" name="otp" type="text" autocomplete="one-time-code" maxlength="6">
+  </div>
+  <button type="submit">Next</button>
+</form>
+<script src="/content.js"></script>

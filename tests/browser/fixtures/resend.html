@@ -1,0 +1,21 @@
+<!doctype html>
+<!--
+  Two submit buttons. The resend button comes first in document order, so it wins
+  any "press the first submit button" strategy — and pressing it invalidates the
+  code that has just been filled in.
+
+  Its wording is deliberate. "Resend confirmation code" reads like a submit button
+  by every test that matters ("confirm..."), which is the only case where the
+  never-press list is doing any work: a button that merely fails to look like a
+  submit button is already skipped without it.
+-->
+<meta charset="utf-8">
+<title>Check your email</title>
+<h1>Enter your login code</h1>
+<form id="form" onsubmit="event.preventDefault(); window.__submitted = true;">
+  <label for="code">Login code</label>
+  <input id="code" name="otp" type="text" autocomplete="one-time-code" maxlength="6">
+  <button type="submit" name="resend" onclick="(window.__clicked = window.__clicked || []).push('Resend confirmation code')">Resend confirmation code</button>
+  <button type="submit" name="verify" onclick="(window.__clicked = window.__clicked || []).push('Verify')">Verify</button>
+</form>
+<script src="/content.js"></script>

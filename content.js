@@ -427,9 +427,16 @@
    * Checked before the list above and against every candidate, including
    * `type="submit"` ones: "Resend code" is a submit button on plenty of forms, and
    * pressing it invalidates the code that was just filled in.
+   *
+   * The destructive verbs are stems on purpose. This list used to hold `delete`
+   * and `remove` as literals, which reads as covering the case and does not:
+   * "Confirm account deletion" and "Confirm removal of this device" contain
+   * neither, and both match `confirm\w*` in the list above \u2014 so both were clicked.
+   * Wording that is dangerous is dangerous in every inflection, so anything added
+   * here should be a stem unless there is a reason it cannot be.
    */
   const AVOID_TEXT =
-    /(cancel|dismiss|close|go back|\bback\b|resend|send again|send another|new code|another code|try another|use another|another (way|method|option)|different|didn['\u2019\u02bc]?t|did not|not you|having trouble|trouble|help|support|sign ?up|register|create account|remember|trust|skip|call me|text me|more options|other options|delete|remove|log ?out|sign ?out)/i;
+    /(cancel|dismiss|close|go back|\bback\b|resend|send again|send another|new code|another code|try another|use another|another (way|method|option)|different|didn['\u2019\u02bc]?t|did not|not you|having trouble|trouble|help|support|sign ?up|register|create account|remember|trust|skip|call me|text me|more options|other options|delet\w*|remov\w*|deactivat\w*|deregister|terminat\w*|revok\w*|unsubscrib\w*|disconnect\w*|log ?out|sign ?out)/i;
 
   /** How long to keep waiting for a button that the page has not enabled yet. */
   const SUBMIT_RETRY_DELAYS = [0, 90, 260];
