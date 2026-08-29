@@ -294,6 +294,20 @@ export async function open({ width = 1024, height = 900 } = {}) {
       await new Promise((resolve) => setTimeout(resolve, 300));
     },
 
+    /** A real key press, so focus moves the way it does for a person. */
+    async press(key, { code = key, virtualKey = 0 } = {}) {
+      for (const type of ['rawKeyDown', 'keyUp']) {
+        await send('Input.dispatchKeyEvent', {
+          type,
+          key,
+          code,
+          windowsVirtualKeyCode: virtualKey,
+          nativeVirtualKeyCode: virtualKey,
+        });
+      }
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    },
+
     async resize(w, h) {
       await send('Emulation.setDeviceMetricsOverride', {
         width: w,

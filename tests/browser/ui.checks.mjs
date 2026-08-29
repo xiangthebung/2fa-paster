@@ -412,6 +412,121 @@ export async function run(page, report) {
   }
 
   /* ---------------------------------------------------------------- *
+   * Keyboard and screen reader
+   * ---------------------------------------------------------------- */
+
+  for (const [name, width, height] of [
+    ['popup.html', 380, 640],
+    ['options.html', 1024, 900],
+  ]) {
+    await page.resize(width, height);
+    await page.open(name, { before: stub(clone()) });
+
+    // Open every disclosure first, so the controls inside one are held to the
+    // same standard as the rest. Closed is not the interesting state: Chrome now
+    // hides collapsed `<details>` content with `content-visibility` rather than
+    // `display: none`, so those controls still have a layout box while being
+    // correctly unreachable — which reads as a keyboard trap and is not one.
+    await page.evaluate(`
+      (() => {
+        for (const details of document.querySelectorAll('details')) details.open = true;
+      })()
+    `);
+    await page.evaluate(`new Promise((resolve) => requestAnimationFrame(resolve))`);
+
+    // An icon-only button is a blank to a screen reader unless something names
+    // it. The settings gear in the popup is the case this exists for.
+    const unnamed = await page.evaluate(`
+      (() => {
+        const named = (element) => {
+          const own = (element.textContent ?? '').trim();
+          if (own) return true;
+          for (const attribute of ['aria-label', 'title', 'alt', 'value']) {
+            if ((element.getAttribute(attribute) ?? '').trim()) return true;
+          }
+          const by = element.getAttribute('aria-labelledby');
+          if (by && by.split(/\\s+/).some((id) => (document.getElementById(id)?.textContent ?? '').trim())) {
+            return true;
+          }
+          return element.labels ? [...element.labels].some((label) => (label.textContent ?? '').trim()) : false;
+        };
+
+        return [...document.querySelectorAll('button, a[href], select, input:not([type="hidden"])')]
+          .filter((element) => element.offsetParent !== null || element.getClientRects().length > 0)
+          .filter((element) => !named(element))
+          .map((element) => element.id || element.className || element.tagName)
+          .slice(0, 8);
+      })()
+    `);
+    check(unnamed.length === 0, `${name}: controls with no accessible name: ${JSON.stringify(unnamed)}`);
+
+    // Walk the page with Tab, the way somebody who cannot use a mouse does. Two
+    // things are being asked at once: does focus reach every control, and can you
+    // see where it is when it gets there.
+    await page.evaluate(`document.body.focus()`);
+
+    // Tag every control with something unique before walking, rather than
+    // identifying it afterwards by id or class. Half of these controls share a
+    // class — seven `tour-dot`s, eight `step-watch-button`s — so counting
+    // distinct names undercounts badly and reads as a page that cannot be
+    // reached by keyboard when it can.
+    const stops = await page.evaluate(`
+      (() => {
+        const candidates = [...document.querySelectorAll(
+          'button, a[href], select, input:not([type="hidden"]), [tabindex="0"]',
+        )]
+          .filter((element) => element.offsetParent !== null || element.getClientRects().length > 0)
+          .filter((element) => !element.disabled);
+
+        const keys = new Set();
+        candidates.forEach((element, index) => {
+          // A radio group is one tab stop on purpose: Tab enters the group and
+          // the arrow keys move within it. Counting each radio separately would
+          // report a correct page as broken.
+          const key = element.type === 'radio' ? 'radio:' + element.name : 'control:' + index;
+          element.setAttribute('data-tab-probe', key);
+          keys.add(key);
+        });
+        return keys.size;
+      })()
+    `);
+
+    const reached = new Set();
+    const unfocusable = [];
+    // A few extra presses so the ring has a chance to come round again.
+    for (let step = 0; step < stops + 6; step++) {
+      await page.press('Tab', { virtualKey: 9 });
+      const at = await page.evaluate(`
+        (() => {
+          const element = document.activeElement;
+          if (!element || element === document.body) return null;
+          const style = getComputedStyle(element);
+          const outlined =
+            (style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0) ||
+            style.boxShadow !== 'none';
+          return {
+            probe: element.getAttribute('data-tab-probe'),
+            id: element.id || element.className || element.tagName,
+            outlined,
+          };
+        })()
+      `);
+      if (!at) continue;
+      if (at.probe) reached.add(at.probe);
+      if (!at.outlined && !unfocusable.includes(at.id)) unfocusable.push(at.id);
+    }
+
+    check(
+      reached.size >= stops,
+      `${name}: Tab reached ${reached.size} of ${stops} controls, so some are mouse-only`,
+    );
+    check(
+      unfocusable.length === 0,
+      `${name}: focused with no visible ring, so you cannot tell where you are: ${JSON.stringify(unfocusable.slice(0, 6))}`,
+    );
+  }
+
+  /* ---------------------------------------------------------------- *
    * The setup walkthrough
    * ---------------------------------------------------------------- */
 
