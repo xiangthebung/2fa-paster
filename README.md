@@ -423,6 +423,14 @@ nobody is looking.
 `content.js` is a classic script, not a module, because Chrome does not load
 content scripts as modules. The build fails if an `import` appears in it.
 
+There is an `ai/` directory of working notes that is deliberately not committed —
+it carries dates and absolute paths from whichever machine wrote it, and none of it
+is reviewed. A fresh clone therefore gets the code and none of that context, with
+no sign that any is missing, so: this paragraph is the sign. Nothing in it is
+needed to build, run or change this extension. Anything that turned out to be true
+about the *extension* rather than about the work of changing it was moved into a
+comment beside the code or into this file.
+
 ### What the tests cover
 
 The parts that fail quietly. A scorer that picks the order number, a MIME decoder
@@ -460,10 +468,24 @@ worker sends. They also hold the popup and options page to hit-testing (a click 
 a switch reaches the checkbox), layout stability (nothing moves when a switch is
 flipped), and horizontal containment down to 320px.
 
-What is still unverified: everything that needs a real Gmail account and a real
-extension id. The two readers are tested against fixture responses, not against
-Gmail; OAuth consent, token refresh and revocation are exercised only through
-their error paths.
+### What still needs a person
+
+Named here rather than left to look covered:
+
+- **That `dist/` loads in Chrome.** The build parses every shipped script and fails
+  if the manifest, the HTML or the modules point at a file that is not there, which
+  catches most of it — but a manifest Chrome itself rejects would only show as an
+  error under the card in `chrome://extensions`. This cannot be automated here:
+  current Chrome ignores `--load-extension` in headless mode, so there is no way to
+  load an unpacked extension without a real browser session. Load it once after a
+  change to `manifest.json` and look at the card.
+- **Anything needing a real mailbox.** Both readers are tested against fixture
+  responses, not against Gmail. The Atom feed's own behaviour — that it carries
+  unread inbox mail and nothing else — is Google's, not this code's.
+- **OAuth end to end.** Consent, token refresh and revocation are exercised only
+  through their error paths. Granting and revoking for real needs a Cloud project
+  and an account.
+- **How it looks.** No test has an opinion about that.
 
 ---
 
