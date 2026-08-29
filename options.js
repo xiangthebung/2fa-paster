@@ -88,8 +88,17 @@ function renderSource(status) {
   els.setupChip.className = `chip ${status.apiConfigured ? 'is-good' : 'is-warn'}`;
 
   els.openGmailButton.hidden = true;
-  els.disconnectButton.hidden = true;
   els.primaryAction.disabled = false;
+
+  // Offered under both readers, because both accumulate something worth being
+  // able to throw away: the code in hand, the recent list, the ids of messages
+  // already used, and which mailboxes were found. Only the API reader has a
+  // Google grant to revoke as well, so only it says "disconnect". This used to be
+  // shown solely on the connected-API path, which meant the one control the
+  // privacy policy points at for clearing everything did not exist for anyone
+  // using the default reader.
+  els.disconnectButton.hidden = false;
+  els.disconnectButton.textContent = usingFeed ? 'Forget everything stored' : 'Disconnect and forget';
 
   if (usingFeed) {
     if (status.ready) {
@@ -136,7 +145,6 @@ function renderSource(status) {
     ? `Reading full messages from ${status.email}.`
     : 'Connected to Gmail.';
   els.primaryAction.textContent = 'Re-check connection';
-  els.disconnectButton.hidden = false;
 }
 
 function render(status) {
@@ -265,10 +273,19 @@ function describeAuthError(error) {
 els.disconnectButton.addEventListener('click', async () => {
   els.disconnectButton.disabled = true;
   try {
+    const usingFeed = state?.source === 'feed';
     const response = await send('disconnect');
     if (response.ok) {
       render(response.status);
-      setStatus(els.sourceStatus, 'Disconnected. The Gmail permission has been revoked at Google.', 'good');
+      setStatus(
+        els.sourceStatus,
+        // Do not claim a revocation that did not happen: the inbox-preview reader
+        // never held a Google grant to give back.
+        usingFeed
+          ? 'Forgotten. The stored code, the recent list and the mailbox list are gone, and automatic filling is off.'
+          : 'Disconnected. The Gmail permission has been revoked at Google.',
+        'good',
+      );
     } else {
       setStatus(els.sourceStatus, response.error?.message ?? 'Could not disconnect.', 'error');
     }

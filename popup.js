@@ -435,8 +435,16 @@ function describeOutcome(result) {
     const done = result.submitted ? 'Filled it in and submitted the form' : 'Filled it in';
     return [`${done}.${result.copied ? ' Copied it too.' : ''}`, 'good'];
   }
+  // Each of these has to check `copied` rather than assume it. "Also copy to the
+  // clipboard" is a setting, and telling someone the code is on their clipboard
+  // when it is not sends them to paste nothing into a form that is waiting.
   if (result.fillReason === 'blocked') {
-    return ['Copied it. Chrome does not allow filling on this page.', 'warn'];
+    return [
+      result.copied
+        ? 'Copied it. Chrome does not allow filling on this page.'
+        : 'Chrome does not allow filling on this page. The code is above — copy it.',
+      'warn',
+    ];
   }
   if (result.fillReason === 'no-field') {
     return [
@@ -445,7 +453,12 @@ function describeOutcome(result) {
     ];
   }
   if (result.fillReason === 'rejected') {
-    return ['Copied it. The page would not accept a typed value, so paste it instead.', 'warn'];
+    return [
+      result.copied
+        ? 'Copied it. The page would not accept a typed value, so paste it instead.'
+        : 'The page would not accept a typed value. The code is above — copy it.',
+      'warn',
+    ];
   }
   return [result.copied ? 'Copied it to your clipboard.' : 'Found a code.', 'good'];
 }
@@ -517,16 +530,34 @@ els.pasteButton.addEventListener('click', () =>
   ),
 );
 
-/** @param {string} text */
+/**
+ * Put a code on the clipboard.
+ *
+ * Written from here rather than through the worker because the popup is focused,
+ * so the write is permitted and needs no offscreen document — but the wipe timer
+ * belongs to the worker, which is the only thing still alive once this window
+ * closes. Forgetting to arm it is why "wipe the clipboard after 30 seconds" used
+ * to hold for a code the extension copied on your behalf and silently not for one
+ * you copied yourself, which is the opposite of what the setting says.
+ *
+ * @param {string} text
+ */
 async function copy(text) {
   if (!text) return false;
   try {
-    // The popup is focused, so this is allowed and needs no offscreen document.
     await navigator.clipboard.writeText(text);
-    return true;
   } catch {
+    // No clipboard access from here; the worker's offscreen document arms its own
+    // timer, so this path needs nothing further.
     return Boolean((await send('copy', { text })).ok);
   }
+  try {
+    await send('clipboard-written');
+  } catch {
+    // The code is on the clipboard either way. Reporting a failure here would
+    // describe the wrong thing.
+  }
+  return true;
 }
 
 async function copyShownCode() {
@@ -566,9 +597,12 @@ els.historyList.addEventListener('click', async (event) => {
   const code = row.dataset.code;
   if (!code) return;
 
-  await copy(code);
+  const copied = await copy(code);
   if (!state?.tab?.id) {
-    setStatus('Copied it. There is no page here to fill.', 'warn');
+    setStatus(
+      copied ? 'Copied it. There is no page here to fill.' : 'There is no page here to fill.',
+      'warn',
+    );
     return;
   }
 
@@ -578,7 +612,7 @@ els.historyList.addEventListener('click', async (event) => {
       setStatus(explain(response.error), 'error');
       return;
     }
-    const [text, tone] = describeOutcome({ ...response.result, copied: true });
+    const [text, tone] = describeOutcome({ ...response.result, copied });
     setStatus(text, tone);
   } catch (error) {
     setStatus(error.message, 'error');

@@ -849,6 +849,19 @@ const handlers = {
     return { ok: copied };
   },
 
+  /**
+   * The popup wrote to the clipboard itself; arm the wipe.
+   *
+   * The popup can reach the clipboard directly because it is focused, which is
+   * faster and avoids building an offscreen document. The timer cannot live
+   * there: the popup is gone the moment it loses focus, and an alarm set by a
+   * dead page never fires.
+   */
+  async 'clipboard-written'() {
+    await scheduleClipboardClear((await readSettings()).clipboardClearSeconds);
+    return { ok: true };
+  },
+
   async settings({ patch }) {
     const settings = await writeSettings(patch ?? {});
     await syncAutoRegistration(settings);
@@ -1009,9 +1022,18 @@ chrome.runtime.onStartup.addListener(() => {
 
 chrome.runtime.onInstalled.addListener((details) => {
   (async () => {
-    await syncAutoRegistration();
-    // A fresh install cannot do anything until it has an OAuth client ID, so
-    // send people straight to the page that explains how to get one.
-    if (details.reason === 'install' && !isConfigured()) await chrome.runtime.openOptionsPage();
+    const settings = await readSettings();
+    await syncAutoRegistration(settings);
+
+    // Open the setup page only when the reader that is actually selected cannot
+    // work without it. This used to open on any install without a client ID,
+    // which is every default install — so a first run landed on a seven-step
+    // Google Cloud walkthrough that the default reader does not need and never
+    // asks for. The honest first run is no page at all: sign in to Gmail, press
+    // the button. Anyone whose synced settings already select the API reader does
+    // still need those steps, and gets them.
+    if (details.reason === 'install' && settings.source === SOURCES.api && !isConfigured()) {
+      await chrome.runtime.openOptionsPage();
+    }
   })().catch(() => {});
 });

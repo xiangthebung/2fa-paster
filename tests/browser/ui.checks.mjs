@@ -117,7 +117,11 @@ function stub(status) {
           }
           if (message.type === 'has-field') return { ok: true, hasField: true };
           if (message.type === 'refill') {
-            return { ok: true, found: true, result: { code: '482913', filled: true, submitted: true } };
+            return {
+              ok: true,
+              found: true,
+              result: status.__refill ?? { code: '482913', filled: true, submitted: true, copied: true },
+            };
           }
           return { ok: true };
         },
@@ -219,8 +223,41 @@ export async function run(page, report) {
   check(patches.includes('autoSubmit'), `popup: a real click sent no setting change: ${patches}`);
 
   /* ---------------------------------------------------------------- *
+   * The popup does not claim a copy that did not happen
+   * ---------------------------------------------------------------- */
+
+  {
+    // "Also copy to the clipboard" is a setting. With it off and the page
+    // refusing the fill, the popup used to say "Copied it" regardless — which
+    // sends someone to paste nothing into a form that is waiting for a code.
+    for (const [reason, why] of [
+      ['blocked', 'a page Chrome will not let us script'],
+      ['rejected', 'a page that refused the typed value'],
+    ]) {
+      await page.open('popup.html', {
+        before: stub(
+          clone(
+            { __refill: { code: '482913', filled: false, fillReason: reason, copied: false } },
+            { autoCopy: false },
+          ),
+        ),
+      });
+      await page.evaluate(`document.getElementById('fill-button').click()`);
+      await page.evaluate(`new Promise((resolve) => setTimeout(resolve, 300))`);
+      const said = await page.evaluate(`document.getElementById('status').textContent`);
+      check(
+        !/copied/i.test(said),
+        `popup on ${why} with copying off: said "${said}", which claims a copy that did not happen`,
+      );
+      check(said.trim().length > 0, `popup on ${why}: said nothing at all`);
+    }
+  }
+
+  /* ---------------------------------------------------------------- *
    * Nothing moves when a switch is flipped
    * ---------------------------------------------------------------- */
+
+  await page.open('popup.html', { before: stub(clone()) });
 
   const shift = await page.evaluate(`
     (async () => {
@@ -274,6 +311,44 @@ export async function run(page, report) {
   `);
   for (const hit of optionSwitches) {
     check(hit.ok, `options: a click on the ${hit.id} switch lands on "${hit.hit}", not the checkbox`);
+  }
+
+  /* ---------------------------------------------------------------- *
+   * There is always a way to throw everything away
+   * ---------------------------------------------------------------- */
+
+  {
+    // The privacy policy points at this button as the way to clear what is
+    // stored. It used to be revealed only on the connected-API path, so under the
+    // default reader — the one that needs no setup and is what almost everyone
+    // runs — the control the policy describes was not on the page at all.
+    const forget = [
+      ['the default inbox-preview reader', clone(), 'Forget everything stored'],
+      [
+        'the connected API reader',
+        clone({ source: 'api', ready: true, apiConfigured: true }, { source: 'api' }),
+        'Disconnect and forget',
+      ],
+      [
+        'the API reader before it is connected',
+        clone({ source: 'api', ready: false, apiConfigured: true }, { source: 'api' }),
+        'Disconnect and forget',
+      ],
+    ];
+
+    for (const [name, status, label] of forget) {
+      await page.open('options.html', { before: stub(status) });
+      const button = await page.evaluate(`
+        (() => {
+          const element = document.getElementById('disconnect-button');
+          const rect = element.getBoundingClientRect();
+          return { hidden: element.hidden, text: element.textContent.trim(), width: Math.round(rect.width) };
+        })()
+      `);
+      check(button.hidden === false, `options with ${name}: no way to forget what is stored — the button is hidden`);
+      check(button.width > 0, `options with ${name}: the forget button has no box`);
+      check(button.text === label, `options with ${name}: the button reads "${button.text}", expected "${label}"`);
+    }
   }
 
   for (const [width, why] of NARROW_WIDTHS) {
