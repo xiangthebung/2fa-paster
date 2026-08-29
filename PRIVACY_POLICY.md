@@ -1,6 +1,6 @@
 # Privacy policy — 2FA Paster
 
-Last updated: 29 July 2026
+Last updated: 29 August 2026
 
 2FA Paster runs entirely inside your browser. It has no server, no account, and no
 operator with access to anything. There is nothing for the author of this extension
@@ -53,10 +53,27 @@ are discarded as soon as that is done.
 
 **The page you are on.** To type a code into a box, the extension needs to run a
 script in the page. By default it does this only in the tab you are looking at, and
-only at the moment you ask for a code. Automatic filling needs standing access to
-the sites you visit, so it is off until you turn it on, and Chrome asks you to grant
-that access separately. The page script looks for input fields and writes to one of
-them. It does not read page content, and it does not send anything anywhere.
+only when it has something to do there: when you ask for a code, and also while the
+popup is open, because the popup tells you whether this page has a code box and it
+cannot know that without looking. Automatic filling needs standing access to the
+sites you visit, so it is off until you turn it on, Chrome asks you to grant that
+access separately, and while it is on the script runs on every page you open so it
+can notice a code box appearing.
+
+What that script reads, it reads in order to find the right box, and none of it is
+stored or sent out of your browser:
+
+- each input field's attributes, its label, and up to 400 characters of the text
+  around it — "verification code" is often written above the field rather than in
+  it, and a checkout page's "security code" is how a CVV box gets labelled, so this
+  text is what tells the two apart;
+- the text on the form's buttons, to find the one that submits the code step and to
+  avoid the ones that must never be pressed for you.
+
+It sends one message, to the extension's own service worker and nowhere else: that
+this page has a code box, with the page's address, so automatic filling knows to
+start watching for the mail. The worker reduces that to the site's domain and keeps
+only the domain. Nothing about the page leaves your browser.
 
 The one thing it adds to the page is a small confirmation card in the corner after a
 fill, so an automatic fill never looks like the page acting on its own. It never
@@ -72,7 +89,7 @@ sent anywhere.
 
 | What | Where | Lifetime |
 | --- | --- | --- |
-| The most recent code, its sender, subject and timestamp | `chrome.storage.session` | Until Chrome closes, or you disconnect |
+| The most recent code, its sender, subject, timestamps, the id of the message it came from, the site it was filled into, and why it was picked (its score and the reasons shown under "Why this one") | `chrome.storage.session` | Until Chrome closes, or you forget it |
 | The recent-codes list: the same details for up to 12 codes, plus which site each was filled into | `chrome.storage.session` | Your chosen window — 30 minutes by default, and "do not keep a list" switches it off |
 | Ids of messages already delivered (the last 40) | `chrome.storage.session` | Until Chrome closes |
 | The current inbox watch, if any | `chrome.storage.session` | Minutes; cleared when the watch ends |
@@ -94,16 +111,32 @@ Three hosts, all Google's:
 - `gmail.googleapis.com` — the searches and message reads, if you use the API reader
 - `oauth2.googleapis.com` — revoking the token when you disconnect
 
-The extension's content security policy restricts network access to those three
-hosts, so it cannot contact anywhere else even by mistake. There is no analytics,
-no telemetry, no crash reporting, and no third-party code of any kind.
+Those are the only three the code contacts, and a test in the repository fails if a
+fourth appears. The extension's content security policy names the same three, which
+covers its own pages and the background worker — the parts that do all the network
+work. It does not cover the script injected into web pages, which runs under the
+page's own policy; that script makes no requests at all, but that is a fact about
+the code rather than something Chrome is enforcing.
 
-## The clipboard
+There is no analytics, no telemetry, no crash reporting, and no third-party code of
+any kind. The extension has no dependencies.
+
+## The clipboard, and the notification
 
 When a code is copied, it is written to your system clipboard, which makes it
 available to other applications until something replaces it — this is how the
 clipboard works generally, and is the point of copying. The "wipe the clipboard
-after" setting overwrites it on a timer if you would rather not leave it there.
+after" setting overwrites it on a timer if you would rather not leave it there. It
+applies to every copy the extension makes, including the ones you ask for by
+pressing Copy or clicking a code.
+
+Desktop notifications are the other place a code can end up outside the extension.
+When the code could not be put into the page — no code box, or a page extensions are
+not allowed to touch — the notification shows the code itself, because reading it
+off the notification is then the fastest way to finish. Your operating system may
+keep that notification in a history that outlives the code. When the fill did
+succeed, the notification says so without repeating the code. Switching off "Show a
+desktop notification" stops all of it.
 
 ## Your Google credentials
 
@@ -118,8 +151,11 @@ visibility into it.
 You can withdraw access at any time:
 
 - **Clear** in the popup's recent-codes list drops that list immediately.
-- **Disconnect and forget** on the extension's options page revokes any OAuth token
-  at Google and clears every stored code, message id and account address.
+- **Forget everything stored** on the options page clears the stored code, the
+  recent list, the ids of messages already used and the list of signed-in
+  addresses, and switches automatic filling off. Under the API reader the same
+  button reads **Disconnect and forget** and additionally revokes the OAuth token
+  at Google.
 - Signing out of Gmail, or removing the `mail.google.com` permission, stops the
   default reader.
 - [Google Account → Third-party access](https://myaccount.google.com/connections)
@@ -135,8 +171,10 @@ age-gated functionality.
 
 Any change to what is accessed or stored will be reflected here, with the date
 above updated. Since the extension is distributed as source you build yourself, you
-can also read `gmail.js` and `background.js` to confirm exactly which requests are
-made.
+can confirm all of it for yourself: `inbox-feed.js` and `gmail.js` are the only two
+files that fetch mail, `auth.js` is the only one that touches a token, `settings.js`
+is the only one that writes to storage, and `content.js` is the whole of what runs
+inside a web page.
 
 ## Contact
 
