@@ -284,6 +284,21 @@ delivering it to the user — is not transferred to anyone, is not used for adve
 or any other purpose, is not used to determine creditworthiness, and is not read by
 any human. There is no server to read it on.
 
+## Published policy URLs
+
+Paste these into the Developer Dashboard. They are live now — check them before
+you submit rather than after, because a reviewer following a dead privacy link is
+a rejection, and this collection has already shipped one extension whose in-product
+legal links pointed at a host that did not exist.
+
+```
+Privacy policy   https://personal-website.xiangli3625.workers.dev/legal/two-factor-paster/privacy
+```
+
+The copy in this repository is the original. The portfolio site keeps a vendored
+copy and its test suite diffs the two, so edit the file here and re-copy — never
+the published page on its own.
+
 ## Privacy practices selections
 
 Answer **Yes** to "Does this item collect or use user data?", then disclose these and
