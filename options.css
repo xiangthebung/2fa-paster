@@ -273,6 +273,12 @@ code {
 .snippet code { padding: 0; background: none; color: inherit; font-size: 13px; }
 
 .plain-list { display: grid; gap: 8px; padding-left: 18px; color: var(--secondary); list-style: disc; }
+/* `.apps.googleusercontent.com` is 28 unbreakable characters, and at 320px inside a
+   list that is already indented 18px for its bullets there is no room for it. It fit
+   in Segoe UI and did not in the CI runner's monospace fallback, which is the only
+   reason anyone found out. Same rule the setup checklist and the option copy already
+   carry -- this list was the one that missed it. */
+.plain-list code { overflow-wrap: anywhere; word-break: break-word; }
 
 /* ----------------------------------------------------------------- *
  * Full-message setup walkthrough
