@@ -295,7 +295,10 @@ test('every source file the policy points at exists', () => {
 });
 
 test('the policy carries a date, and it is not older than the code it describes', () => {
-  const dated = policy.match(/^Last updated: (\d{1,2} \w+ \d{4})$/m);
-  assert.ok(dated, 'the policy has no "Last updated" line');
+  /* `Effective:`, not `Last updated:`. A policy's date is the date it governs from,
+     which is the thing a reader needs; when it was last edited is a fact about us. It
+     also matches the other published policies this author keeps. */
+  const dated = policy.match(/^Effective: (\d{1,2} \w+ \d{4})$/m);
+  assert.ok(dated, 'the policy has no "Effective" line');
   assert.ok(!Number.isNaN(Date.parse(dated[1])), `"${dated[1]}" is not a date`);
 });

@@ -1,6 +1,6 @@
 # Privacy policy — 2FA Paster
 
-Last updated: 29 August 2026
+Effective: 29 August 2026
 
 2FA Paster runs entirely inside your browser. It has no server, no account, and no
 operator with access to anything. There is nothing for the author of this extension
@@ -178,4 +178,8 @@ inside a web page.
 
 ## Contact
 
-Raise an issue on the repository this extension came from.
+Questions or privacy concerns: **xiangli3625@gmail.com**.
+
+An issue on the repository this extension came from works too, and is the better
+place for anything that is not about your own data — but a privacy policy has to
+name somebody you can reach privately, and a public issue tracker is not that.
