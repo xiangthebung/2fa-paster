@@ -1,0 +1,61 @@
+name: verify
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+# A push to a branch with an open pull request fires this twice, in parallel,
+# against the same commit.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: unit tests + build + real Chrome
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # Node 24, matching the version this is developed on and every sibling
+      # repository in this collection.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      # No `npm ci`: this extension has no dependencies, which is the point of it
+      # and also why there is no lockfile to cache.
+
+      # `verify` is the unit tests, then the build, then the browser checks — in
+      # that order on purpose, because the browser checks load `dist/`, which is
+      # the directory `npm run zip` packages. They exercise the artefact a user
+      # installs rather than the repository.
+      #
+      # The harness finds Chrome itself and already knows the Linux paths; the
+      # runner image ships google-chrome-stable. CHROME_PATH overrides it if that
+      # ever stops being true.
+      - run: npm run verify
+
+      # The store screenshots are photographs of `dist/`, and the script that
+      # takes them asserts what it is photographing — `03-guard` fails the run
+      # unless the sample page recorded "Continue" pressed and both "Resend code"
+      # and "Remove this device" not pressed. That assertion is the reason this
+      # step is here: it is a behavioural check on the fill guard that happens to
+      # produce a picture, and running it only when someone remembers to would
+      # make it worth nothing.
+      - run: npm run store:assets
+
+      # The packaged artefact comes out of the same code path a release does, so
+      # a broken zip step fails here rather than on submission day.
+      - run: npm run zip
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: 2fa-paster-zip
+          path: artifacts/*.zip
+          if-no-files-found: error
