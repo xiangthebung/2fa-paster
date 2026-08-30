@@ -10,6 +10,7 @@
     "watch": "node scripts/build.mjs --watch",
     "zip": "node scripts/build.mjs --zip",
     "icons": "node scripts/icons.mjs",
+    "store:assets": "npm run build && node scripts/store-shots.mjs",
     "test": "node --test \"tests/*.test.mjs\"",
     "test:browser": "node tests/browser/run.mjs",
     "verify": "npm run test && npm run build && npm run test:browser"

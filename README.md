@@ -398,6 +398,7 @@ npm run watch        rebuild on change
 npm run zip          build, then a verified artifacts/2fa-paster-<version>.zip
 npm run clean        remove dist/ and artifacts/
 npm run icons        re-export the PNGs after editing icons/icon.svg
+npm run store:assets build, then re-render the store screenshots and tile
 ```
 
 `npm test` needs nothing but Node: no install step, and there is nothing to
@@ -407,6 +408,18 @@ install — `package.json` has no dependencies at all.
 usual places or named by `CHROME_PATH`, and a `dist/` to drive. Without one it
 prints what it would have covered and exits zero, so it never blocks work that
 does not touch the browser.
+
+`npm run store:assets` writes `store-assets/` — five 1280×800 screenshots and the
+440×280 promotional tile that [STORE_LISTING.md](STORE_LISTING.md) submits alongside.
+It needs the same Chrome the browser checks need, and it uses the same harness to
+find it, so there is no extra install. Every picture is `dist/` driven through its
+own interface: the popup and the options page are the shipped files rendering
+themselves, and the code in the sign-in pages is put there by `content.js` doing
+its real work. The mail behind them is invented — three services on the reserved
+`.example` domain — but the confidence and the "Why this one" reasons on screen are
+computed by importing `code-finder.js`, so a picture cannot claim a score the
+scorer would not give. The script measures every file it writes and fails rather
+than emitting one that is the wrong size for the store.
 
 `npm run icons` is the exception to the no-dependencies rule: it borrows `sharp`
 from a sibling project in the same workspace rather than adding it here, and does

@@ -80,12 +80,32 @@ const TYPES = {
  * One origin matters: a fixture page loads `content.js` with a relative `<script
  * src>`, and the script it loads has to be the built one rather than a copy that
  * could drift.
+ *
+ * `pages` is a live map of extra files that exist only in memory, checked before
+ * either directory. The checks do not use it; `scripts/store-shots.mjs` does, to
+ * serve the invented sign-in pages it photographs — and to hand back the popup
+ * PNGs it has just captured so a frame page can lay them out. Live rather than
+ * copied, because those PNGs do not exist yet when the server starts.
+ *
+ * @param {Map<string, { body: string | Buffer, type?: string }>} pages
  */
-async function serve() {
+async function serve(pages) {
   const fixtures = path.join(root, 'tests', 'browser', 'fixtures');
 
   const server = createServer(async (request, response) => {
     const name = decodeURIComponent(request.url.split('?')[0]).replace(/^\/+/, '');
+
+    const virtual = pages.get(name);
+    if (virtual) {
+      response
+        .writeHead(200, {
+          'content-type': virtual.type ?? TYPES[path.extname(name)] ?? 'text/html; charset=utf-8',
+          'cache-control': 'no-store',
+        })
+        .end(virtual.body);
+      return;
+    }
+
     const base = name.startsWith('fixtures/') ? fixtures : dist;
     const relative = name.startsWith('fixtures/') ? name.slice('fixtures/'.length) : name;
     const file = path.resolve(base, relative);
@@ -168,19 +188,25 @@ async function launchChrome(binary) {
  * @property {(x: number, y: number) => Promise<void>} click
  * @property {(width: number, height: number) => Promise<void>} resize
  * @property {(media: Array<{ name: string, value: string }>) => Promise<void>} emulateMedia
+ * @property {(options?: { clip?: { x: number, y: number, width: number, height: number } }) => Promise<Buffer>} screenshot
  * @property {string} origin
  */
 
 /**
  * Bring up the browser, the server and one page.
  *
+ * @param {{ width?: number, height?: number,
+ *           pages?: Map<string, { body: string | Buffer, type?: string }> }} [options]
+ *   `pages` is served ahead of `dist/` and the fixtures, and is read on every
+ *   request rather than copied, so a caller can add to it while the browser is
+ *   running. See `serve`.
  * @returns {Promise<{ page: Page, close: () => Promise<void> }>}
  */
-export async function open({ width = 1024, height = 900 } = {}) {
+export async function open({ width = 1024, height = 900, pages = new Map() } = {}) {
   const binary = findChrome();
   if (!binary) throw new Error('no Chrome found');
 
-  const { server, port } = await serve();
+  const { server, port } = await serve(pages);
   const { child, profile, endpoint } = await launchChrome(binary);
 
   const socket = new WebSocket(endpoint);
@@ -319,6 +345,27 @@ export async function open({ width = 1024, height = 900 } = {}) {
 
     async emulateMedia(features) {
       await send('Emulation.setEmulatedMedia', { features });
+    },
+
+    /**
+     * A PNG of the viewport, or of one box in the page.
+     *
+     * Used by `scripts/store-shots.mjs`, not by the checks. `clip` is in page
+     * coordinates, and `captureBeyondViewport` is what lets it reach a card
+     * below the fold without scrolling the page first — scrolling moves sticky
+     * headers and re-triggers entry animations, and the store images should not
+     * depend on either.
+     *
+     * @param {{ clip?: { x: number, y: number, width: number, height: number } }} [options]
+     * @returns {Promise<Buffer>}
+     */
+    async screenshot({ clip } = {}) {
+      const { data } = await send('Page.captureScreenshot', {
+        format: 'png',
+        captureBeyondViewport: Boolean(clip),
+        ...(clip ? { clip: { ...clip, scale: 1 } } : {}),
+      });
+      return Buffer.from(data, 'base64');
     },
   };
 

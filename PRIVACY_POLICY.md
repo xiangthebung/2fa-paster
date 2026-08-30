@@ -148,6 +148,17 @@ If you switch to the API reader, the OAuth client it uses is one you create in y
 own Google Cloud project. The extension's author has no involvement in it and no
 visibility into it.
 
+That is true because the only way to have this extension today is to build it from
+source, and the build writes *your* client ID — from a `client-id.local` that never
+leaves your machine — into the manifest. It would stop being true the day a build is
+published to the Chrome Web Store, because a published ZIP carries one client for
+everyone who installs it, and that one would be the author's. The extension has no
+runtime path for supplying your own; Chrome reads the client ID out of the manifest.
+
+So this paragraph is a condition, not a permanent fact. If this is ever published,
+this paragraph is rewritten in the same commit that publishes it — not left standing
+to say something that used to be so.
+
 You can withdraw access at any time:
 
 - **Clear** in the popup's recent-codes list drops that list immediately.
