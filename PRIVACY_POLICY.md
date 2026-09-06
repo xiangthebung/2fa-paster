@@ -1,6 +1,6 @@
 # Privacy policy — 2FA Paster
 
-Effective: 29 August 2026
+Effective: 4 September 2026
 
 2FA Paster runs entirely inside your browser. It has no server, no account, and no
 operator with access to anything. There is nothing for the author of this extension
@@ -19,6 +19,14 @@ The feed returns, per message: the sender's name and address, the subject, a sho
 snippet of the body, and a timestamp. It does **not** return full messages, and it
 covers **unread inbox mail only** — anything you have read, archived, or that was
 filed outside the inbox is not visible to it at all.
+
+With Gmail's tabbed inbox, that plain feed is the Primary tab. When it holds no code,
+the extension also reads the feeds for the Updates, Promotions, Social and Forums
+tabs — the same unread inbox mail, filed under another tab, from the same host with
+the same session and the same fields. Each entry also carries Gmail's own link to the
+message, which is kept beside the code so the popup can offer to open that mail for
+you to check the sender. Opening it, like "Open Gmail search" on the popup, is
+something you click; nothing here fetches either page.
 
 One point worth being exact about, because it cuts the other way. Riding the
 browser session means the *permission* is broader than the use. Chrome grants
@@ -70,15 +78,21 @@ stored or sent out of your browser:
 - the text on the form's buttons, to find the one that submits the code step and to
   avoid the ones that must never be pressed for you.
 
-It sends one message, to the extension's own service worker and nowhere else: that
-this page has a code box, with the page's address, so automatic filling knows to
-start watching for the mail. The worker reduces that to the site's domain and keeps
-only the domain. Nothing about the page leaves your browser.
+It sends two messages, to the extension's own service worker and nowhere else. The
+first says that this page has a code box, with the page's address, so automatic
+filling knows to start watching for the mail; the worker reduces that to the site's
+domain and keeps only the domain. The second says that a button on the extension's
+own card was used — "Submit anyway", or a swap to a different code — with which code
+went in and which button was pressed, so the popup can describe what actually
+happened. Nothing else about the page leaves your browser.
 
-The one thing it adds to the page is a small confirmation card in the corner after a
-fill, so an automatic fill never looks like the page acting on its own. It never
-shows the code, and it is drawn in a closed shadow root the page cannot read or
-restyle.
+The one thing it adds to the page is a small card in the corner after a fill, so an
+automatic fill never looks like the page acting on its own. It says what was filled
+and which button was pressed, and it never repeats the code that went in. When other
+codes arrived at the same time it lists them — those codes, and the address each came
+from, all from your own inbox — so a wrong pick can be swapped for the right one in a
+click; pressing the keyboard shortcut a second time brings that list back. It is
+drawn in a closed shadow root the page cannot read or restyle.
 
 **Which site you were on.** When a code is filled in, the site's domain — `github.com`,
 not the full address — is kept alongside it in the recent list, so the list can say
@@ -89,17 +103,19 @@ sent anywhere.
 
 | What | Where | Lifetime |
 | --- | --- | --- |
-| The most recent code, its sender, subject, timestamps, the id of the message it came from, the site it was filled into, and why it was picked (its score and the reasons shown under "Why this one") | `chrome.storage.session` | Until Chrome closes, or you forget it |
+| The most recent code, its sender's name and address, the subject, timestamps, the id of the message it came from and Gmail's link to it, which of your signed-in mailboxes it was read from, the site it was filled into, why it was picked (its score and the reasons shown under "Why this one"), and what was done with it: the label of the field it went into, the wording of the button that was pressed, and the labels of the fields it passed over and why | `chrome.storage.session` | Until Chrome closes, or you forget it |
 | The recent-codes list: the same details for up to 12 codes, plus which site each was filled into | `chrome.storage.session` | Your chosen window — 30 minutes by default, and "do not keep a list" switches it off |
 | Ids of messages already delivered (the last 40) | `chrome.storage.session` | Until Chrome closes |
 | The current inbox watch, if any | `chrome.storage.session` | Minutes; cleared when the watch ends |
 | Which Gmail addresses are signed in to this browser | `chrome.storage.local` | Until you disconnect or re-check |
+| Whether the first-run tip has been shown: two timestamps, when the first code went into a page and when you closed the tip | `chrome.storage.local` | Until the extension is removed |
 | Your settings | `chrome.storage.sync` | Until you change them or remove the extension |
 | Your Gmail access token, if you use the API reader | Managed by Chrome, not by this extension | Chrome refreshes and expires it |
 
 `chrome.storage.session` is memory-backed and is not written to disk. Settings are
 preferences only — freshness window, which toggles are on — and contain no message
-data and no credentials.
+data and no credentials. The first-run record is two timestamps and nothing else: no
+code, no mail, no page.
 
 Message bodies are never stored. They are decoded, scanned for a code, and dropped.
 

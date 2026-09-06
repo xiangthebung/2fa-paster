@@ -92,6 +92,14 @@ test('normalizeMessage flattens a message resource', () => {
   assert.equal(message.snippet, 'Your code is 123456 & expires soon');
 });
 
+test('a message carries an address Gmail can open it at', () => {
+  // The API returns no web address, so one is written from the id. Gmail's own
+  // UI opens any message by id; the popup offers it as "Open in Gmail".
+  const message = normalizeMessage({ id: 'abc 123', internalDate: '1', payload: { headers: [] }, snippet: '' });
+  assert.equal(message.link, 'https://mail.google.com/mail/#all/abc%20123');
+  assert.equal(normalizeMessage({}).link, '');
+});
+
 test('a message with no readable parts falls back to the snippet', () => {
   const message = normalizeMessage({
     id: 'only-snippet',

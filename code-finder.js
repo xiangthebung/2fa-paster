@@ -627,8 +627,9 @@ const MAX_ALTERNATIVES = 4;
  * @param {Array<{ id: string, from?: string, subject?: string, text?: string, receivedAt?: number }>} messages
  * @param {{ site?: string, now?: number, skipMessageIds?: Set<string> | string[] }} [options]
  * @returns {{ code: string, confidence: number, messageId: string, from: string, subject: string,
- *             senderSite: string, receivedAt: number, reasons: string[], siteMatch: boolean,
- *             ambiguous: boolean, alternatives: Array<object> } | null}
+ *             senderSite: string, receivedAt: number, link: string, account: string,
+ *             reasons: string[], siteMatch: boolean, ambiguous: boolean,
+ *             alternatives: Array<object> } | null}
  */
 export function findBestCode(messages, { site = '', now = Date.now(), skipMessageIds } = {}) {
   const skip = skipMessageIds instanceof Set ? skipMessageIds : new Set(skipMessageIds ?? []);
@@ -649,6 +650,11 @@ export function findBestCode(messages, { site = '', now = Date.now(), skipMessag
       subject: message.subject ?? '',
       senderSite: senderDomain(message.from ?? ''),
       receivedAt: message.receivedAt ?? now,
+      // Where to open it, and which mailbox it was read from. Neither affects the
+      // pick; both are what lets the popup say "open this one in Gmail" and, with
+      // two accounts signed in, which of them the code landed in.
+      link: message.link ?? '',
+      account: message.account ?? '',
       ageMinutes: Math.max(0, (now - (message.receivedAt ?? now)) / 60000),
     });
   }
@@ -691,6 +697,8 @@ export function findBestCode(messages, { site = '', now = Date.now(), skipMessag
       subject: candidate.subject,
       senderSite: candidate.senderSite,
       receivedAt: candidate.receivedAt,
+      link: candidate.link,
+      account: candidate.account,
       siteMatch: candidate.affinity === AFFINITY.match,
     }));
 
@@ -702,6 +710,8 @@ export function findBestCode(messages, { site = '', now = Date.now(), skipMessag
     subject: winner.subject,
     senderSite: winner.senderSite,
     receivedAt: winner.receivedAt,
+    link: winner.link,
+    account: winner.account,
     reasons: winner.reasons,
     siteMatch: winner.affinity === AFFINITY.match,
     // Distinct codes from distinct senders, and nothing tying any of them to the

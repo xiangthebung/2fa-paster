@@ -24,7 +24,60 @@
  * container never scrolled the document at all. Its label simply painted outside
  * its own box and across the input below it, which no page-level width assertion
  * would ever have noticed.
+ *
+ * A fourth class arrived with the decision card: *the words*. "Pressed Verify",
+ * "Skipped 'Security code' — card field", "Held — check the sender" are the whole
+ * point of that card, and each is assembled from a record by a renderer. The
+ * checks below render the states and read the sentences back.
  */
+
+/** A delivered code as `deliver` stores it, with the outcome the card lists. */
+const LAST_CODE = {
+  code: '482913',
+  messageId: 'm1',
+  from: 'Example <noreply@example.com>',
+  address: 'noreply@example.com',
+  subject: 'Your verification code',
+  senderSite: 'example.com',
+  receivedAt: 0,
+  link: 'https://mail.google.com/mail?message_id=m1&view=conv',
+  account: 'you@example.com',
+  foundAt: 0,
+  confidence: 82,
+  reasons: ['6 digits', 'in the subject'],
+  siteMatch: true,
+  ambiguous: false,
+  held: false,
+  site: 'example.com',
+  outcome: {
+    filled: true,
+    fillReason: '',
+    kind: 'single',
+    boxes: 1,
+    label: 'Verification code',
+    submitted: true,
+    submitKind: 'clicked',
+    pressed: 'Verify',
+    held: false,
+    submitWanted: true,
+    refused: [{ label: 'Security code', rule: 'card field' }],
+    copied: true,
+    error: '',
+  },
+};
+
+/** The same code, held: several arrived, none tied to the site, filled and not submitted. */
+const HELD_CODE = {
+  ...LAST_CODE,
+  code: '558102',
+  from: 'Account Team <noreply@accountprotection.net>',
+  address: 'noreply@accountprotection.net',
+  senderSite: 'accountprotection.net',
+  siteMatch: false,
+  ambiguous: true,
+  held: true,
+  outcome: { ...LAST_CODE.outcome, submitted: false, submitKind: '', pressed: '', held: true, refused: [], copied: false },
+};
 
 /** Everything `buildStatus` returns, as the pages expect to receive it. */
 const BASE_STATUS = {
@@ -49,30 +102,20 @@ const BASE_STATUS = {
     watchSeconds: 120,
     extraQuery: '',
   },
-  lastCode: {
-    code: '482913',
-    messageId: 'm1',
-    from: 'Example <noreply@example.com>',
-    subject: 'Your verification code',
-    senderSite: 'example.com',
-    receivedAt: 0,
-    foundAt: 0,
-    confidence: 82,
-    reasons: ['6 digits', 'in the subject'],
-    siteMatch: true,
-    ambiguous: false,
-    site: 'example.com',
-  },
+  lastCode: LAST_CODE,
   history: [
     {
       code: '771204',
       messageId: 'm2',
-      from: 'Other <s@other.example>',
-      subject: 'Other code',
-      senderSite: 'other.example',
+      from: 'Security <bounce@sendgrid.net>',
+      subject: 'Your verification code',
+      senderSite: 'sendgrid.net',
       receivedAt: 0,
       seenAt: 0,
       confidence: 70,
+      link: '',
+      account: 'you@example.com',
+      siteMatch: false,
       site: '',
       filled: false,
       submitted: false,
@@ -80,6 +123,7 @@ const BASE_STATUS = {
   ],
   watching: null,
   autoGranted: false,
+  guide: false,
   extensionId: 'browsertestextensionidbrowsertest',
   tab: { id: 7, url: 'https://example.com/login', site: 'example.com', title: 'Sign in' },
 };
@@ -90,7 +134,12 @@ const clone = (extra = {}, settings = {}) => ({
   settings: { ...structuredClone(BASE_STATUS.settings), ...settings },
 });
 
-/** A stand-in service worker, answering the messages both pages send. */
+/**
+ * A stand-in service worker, answering the messages both pages send.
+ *
+ * `__field`, `__paste`, `__refill` and `__submit` on the status are what the
+ * stub answers those four messages with, so a check can stage an outcome.
+ */
 function stub(status) {
   return `(() => {
     const status = ${JSON.stringify(status)};
@@ -102,12 +151,13 @@ function stub(status) {
     if (status.watching) status.watching.until = Date.now() + 90000;
 
     window.__sent = [];
+    window.__opened = [];
     window.chrome = {
       runtime: {
         id: status.extensionId,
         lastError: undefined,
         getURL: (path) => path,
-        openOptionsPage: () => {},
+        openOptionsPage: () => { window.__opened.push('options'); },
         sendMessage: async (message) => {
           window.__sent.push(message);
           if (message.type === 'status') return { ok: true, status: structuredClone(status) };
@@ -115,13 +165,27 @@ function stub(status) {
             Object.assign(status.settings, message.patch);
             return { ok: true, settings: structuredClone(status.settings) };
           }
-          if (message.type === 'has-field') return { ok: true, hasField: true };
+          if (message.type === 'has-field') return status.__field ?? { ok: true, hasField: true, blocked: false, refused: [] };
+          if (message.type === 'paste') return status.__paste ?? { ok: true, found: false };
           if (message.type === 'refill') {
-            return {
-              ok: true,
-              found: true,
-              result: status.__refill ?? { code: '482913', filled: true, submitted: true, copied: true },
+            // The worker records what a re-fill did before answering, so the
+            // popup's next status read sees the same outcome the reply carries.
+            const result = status.__refill ?? { ...status.lastCode, filled: true, submitted: true, copied: true };
+            status.lastCode = result;
+            return { ok: true, found: true, result };
+          }
+          if (message.type === 'submit') {
+            const result = status.__submit ?? {
+              ...status.lastCode,
+              held: false,
+              outcome: { ...(status.lastCode?.outcome ?? {}), submitted: true, submitKind: 'clicked', pressed: 'Verify', held: false },
             };
+            status.lastCode = result;
+            return { ok: true, found: true, result };
+          }
+          if (message.type === 'dismiss-guide') {
+            status.guide = false;
+            return { ok: true };
           }
           return { ok: true };
         },
@@ -129,7 +193,7 @@ function stub(status) {
       commands: { getAll: async () => [{ name: 'paste-code', shortcut: 'Ctrl+Shift+2' }] },
       permissions: { request: async () => false, contains: async () => false },
       storage: { onChanged: { addListener: () => {} } },
-      tabs: { create: async () => {} },
+      tabs: { create: async ({ url }) => { window.__opened.push(url); } },
     };
   })()`;
 }
@@ -146,6 +210,9 @@ const NARROW_WIDTHS = [
   [340, '680 at 200% zoom'],
   [320, 'the narrowest common phone width'],
 ];
+
+/** The visible text of every row in the decision card. */
+const OUTCOME_ROWS = `[...document.querySelectorAll('#code-outcome li')].map((li) => li.textContent)`;
 
 /**
  * @param {import('./harness.mjs').Page} page
@@ -170,9 +237,17 @@ export async function run(page, report) {
       'the API reader with no client ID',
       clone({ ready: false, source: 'api', accounts: [], lastCode: null }, { source: 'api' }),
     ],
+    ['a code filled and held', clone({ lastCode: structuredClone(HELD_CODE) })],
+    ['the first-run tip', clone({ guide: true })],
     [
-      'a code that could belong to anyone',
-      clone({ lastCode: { ...structuredClone(BASE_STATUS.lastCode), siteMatch: false, ambiguous: true } }),
+      'two accounts',
+      clone({
+        email: 'you@example.com, work@example.com',
+        accounts: [
+          { index: 0, account: 'you@example.com' },
+          { index: 1, account: 'work@example.com' },
+        ],
+      }),
     ],
     ['no page to fill', clone({ tab: null, lastCode: null, history: [] })],
     ['an error from the worker', clone({ ready: false, problem: { kind: 'offline', message: 'Could not reach Gmail.' }, lastCode: null, history: [] })],
@@ -181,6 +256,251 @@ export async function run(page, report) {
   for (const [name, status] of states) {
     const complaints = await page.open('popup.html', { before: stub(status) });
     check(complaints.length === 0, `popup with ${name}: ${complaints.join(' | ')}`);
+    // The popup is a fixed 380px wide. Anything wider scrolls sideways in a
+    // window that cannot be resized, which is how a long address gets lost.
+    const width = await page.evaluate(`document.documentElement.scrollWidth`);
+    check(width <= 380, `popup with ${name}: ${width}px wide, wider than the 380px popup`);
+  }
+
+  /* ---------------------------------------------------------------- *
+   * The decision card says what was done
+   * ---------------------------------------------------------------- */
+
+  {
+    await page.open('popup.html', { before: stub(clone()) });
+    const card = await page.evaluate(`
+      (() => ({
+        rows: ${OUTCOME_ROWS},
+        address: document.getElementById('code-address').textContent,
+        origin: document.getElementById('code-origin').textContent,
+        openMail: !document.getElementById('open-mail').hidden,
+        heldHidden: document.getElementById('held-actions').hidden,
+      }))()
+    `);
+    check(
+      JSON.stringify(card.rows) ===
+        JSON.stringify(['Filled “Verification code”', 'Pressed Verify', 'Skipped “Security code” — card field', 'Copied to your clipboard']),
+      `decision card: rows read ${JSON.stringify(card.rows)}`,
+    );
+    check(card.address === 'noreply@example.com', `decision card: the address line reads "${card.address}"`);
+    check(
+      card.origin === 'Sent by example.com — the site you are on',
+      `decision card: the origin line reads "${card.origin}"`,
+    );
+    check(card.openMail, 'decision card: "Open in Gmail" is hidden for a code that has a link');
+    check(card.heldHidden, 'decision card: the held actions show for a code that was submitted');
+
+    // "Open in Gmail" opens the mail, and nothing else.
+    await page.evaluate(`document.getElementById('open-mail').click()`);
+    const opened = await page.evaluate(`JSON.stringify(window.__opened)`);
+    check(opened === JSON.stringify([LAST_CODE.link]), `decision card: Open in Gmail opened ${opened}`);
+  }
+
+  /* ---------------------------------------------------------------- *
+   * The held state: filled, not submitted, two ways out
+   * ---------------------------------------------------------------- */
+
+  {
+    await page.open('popup.html', { before: stub(clone({ lastCode: structuredClone(HELD_CODE) })) });
+    const held = await page.evaluate(`
+      (() => ({
+        origin: document.getElementById('code-origin').textContent,
+        rows: ${OUTCOME_ROWS},
+        submitVisible: !document.getElementById('held-actions').hidden && !document.getElementById('submit-anyway').hidden,
+        alternatives: [...document.querySelectorAll('.alt-button strong')].map((el) => el.textContent),
+        pill: document.getElementById('code-origin').className,
+      }))()
+    `);
+    check(
+      held.origin.startsWith('Held — check the sender'),
+      `held: the origin line reads "${held.origin}", expected it to lead with "Held — check the sender"`,
+    );
+    check(held.origin.includes('none name example.com'), `held: the origin line does not name the site: "${held.origin}"`);
+    check(held.pill.includes('is-unsure'), `held: the origin pill is styled "${held.pill}", not as unsure`);
+    check(
+      held.rows.includes('Not submitted — check the sender first'),
+      `held: the rows do not say the submit was held: ${JSON.stringify(held.rows)}`,
+    );
+    check(held.submitVisible, 'held: no "Submit anyway" button');
+    check(
+      JSON.stringify(held.alternatives) === JSON.stringify(['Use 771204 instead']),
+      `held: the alternatives read ${JSON.stringify(held.alternatives)}`,
+    );
+
+    // "Submit anyway" asks the worker, and the card then says what was pressed.
+    await page.evaluate(`document.getElementById('submit-anyway').click()`);
+    await page.evaluate(`new Promise((resolve) => setTimeout(resolve, 300))`);
+    const after = await page.evaluate(`
+      (() => ({
+        sent: window.__sent.some((m) => m.type === 'submit' && m.tabId === 7),
+        rows: ${OUTCOME_ROWS},
+        heldHidden: document.getElementById('held-actions').hidden,
+      }))()
+    `);
+    check(after.sent, 'held: "Submit anyway" did not send a submit for the current tab');
+    check(after.rows.includes('Pressed Verify'), `held: after submitting, the rows read ${JSON.stringify(after.rows)}`);
+    check(after.heldHidden, 'held: the held actions are still offered after the submit');
+  }
+
+  {
+    // "Use … instead" re-fills with that code, through the same path as the recent list.
+    await page.open('popup.html', { before: stub(clone({ lastCode: structuredClone(HELD_CODE) })) });
+    await page.evaluate(`document.querySelector('.alt-button').click()`);
+    await page.evaluate(`new Promise((resolve) => setTimeout(resolve, 300))`);
+    const refill = await page.evaluate(
+      `JSON.stringify(window.__sent.filter((m) => m.type === 'refill').map((m) => [m.tabId, m.code]))`,
+    );
+    check(refill === JSON.stringify([[7, '771204']]), `held: "Use 771204 instead" sent ${refill}`);
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Nothing found
+   * ---------------------------------------------------------------- */
+
+  {
+    await page.open('popup.html', { before: stub(clone({ __paste: { ok: true, found: false } })) });
+    await page.evaluate(`document.getElementById('paste-button').click()`);
+    await page.evaluate(`new Promise((resolve) => setTimeout(resolve, 300))`);
+    const empty = await page.evaluate(`
+      (() => ({
+        shown: !document.getElementById('empty-card').hidden,
+        codeHidden: document.getElementById('code-card').hidden,
+        body: document.getElementById('empty-body').textContent,
+        hint: document.querySelector('.empty-hint').textContent.replace(/\\s+/g, ' ').trim(),
+        search: !document.getElementById('open-search').hidden,
+        retry: !document.getElementById('retry-button').hidden,
+        upgrade: !document.getElementById('upgrade-button').hidden,
+      }))()
+    `);
+    check(empty.shown, 'nothing found: the empty card did not appear');
+    check(empty.codeHidden, 'nothing found: the old code is still on show above "Nothing found"');
+    check(
+      empty.body.includes('unread Primary mail') && empty.body.includes('Updates, Promotions, Social and Forums'),
+      `nothing found: the body does not say what was read: "${empty.body}"`,
+    );
+    check(empty.body.includes('last 10 minutes'), `nothing found: the body does not state the window: "${empty.body}"`);
+    check(empty.hint.includes('mark it unread'), `nothing found: the hint does not say to mark it unread: "${empty.hint}"`);
+    check(empty.search && empty.retry, 'nothing found: "Open Gmail search" or "Try again" is missing');
+    check(empty.upgrade, 'nothing found: the full-message reader is not offered under the feed');
+
+    await page.evaluate(`document.getElementById('open-search').click()`);
+    const opened = await page.evaluate(`JSON.stringify(window.__opened)`);
+    check(
+      /mail\.google\.com\/mail\/u\/0\/#search\//.test(opened) && /code/.test(opened),
+      `nothing found: "Open Gmail search" opened ${opened}`,
+    );
+
+    // Try again runs the search again, from the card.
+    await page.evaluate(`document.getElementById('retry-button').click()`);
+    await page.evaluate(`new Promise((resolve) => setTimeout(resolve, 300))`);
+    const pastes = await page.evaluate(`window.__sent.filter((m) => m.type === 'paste').length`);
+    check(pastes === 2, `nothing found: "Try again" sent ${pastes - 1} further paste(s), expected 1`);
+  }
+
+  /* ---------------------------------------------------------------- *
+   * The first-run tip
+   * ---------------------------------------------------------------- */
+
+  {
+    await page.open('popup.html', { before: stub(clone({ guide: true })) });
+    const guide = await page.evaluate(`
+      (() => ({
+        shown: !document.getElementById('guide-card').hidden,
+        key: document.getElementById('guide-key').textContent,
+        auto: !document.getElementById('guide-auto').hidden,
+        text: document.getElementById('guide-card').textContent.replace(/\\s+/g, ' '),
+      }))()
+    `);
+    check(guide.shown, 'first run: the tip is not shown when the worker says it is due');
+    check(guide.key === 'Ctrl+Shift+2', `first run: the tip names the shortcut as "${guide.key}"`);
+    check(guide.auto && guide.text.includes('Chrome asks once'), 'first run: the tip does not explain the permission prompt');
+
+    await page.evaluate(`document.getElementById('guide-dismiss').click()`);
+    await page.evaluate(`new Promise((resolve) => setTimeout(resolve, 200))`);
+    const dismissed = await page.evaluate(`
+      (() => ({
+        hidden: document.getElementById('guide-card').hidden,
+        sent: window.__sent.some((m) => m.type === 'dismiss-guide'),
+      }))()
+    `);
+    check(dismissed.hidden && dismissed.sent, 'first run: "Got it" did not close the tip and tell the worker');
+
+    await page.open('popup.html', { before: stub(clone({ guide: true }, { autoFill: true })) });
+    const withAuto = await page.evaluate(`document.getElementById('guide-auto').hidden`);
+    check(withAuto === true, 'first run: the tip explains turning on automatic filling to someone who has');
+
+    await page.open('popup.html', { before: stub(clone({ guide: false })) });
+    check(await page.evaluate(`document.getElementById('guide-card').hidden`), 'first run: the tip shows when it is not due');
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Two accounts, and a page Chrome will not let us into
+   * ---------------------------------------------------------------- */
+
+  {
+    await page.open('popup.html', {
+      before: stub(
+        clone({
+          email: 'you@example.com, work.account.longname@company-domain.example',
+          accounts: [
+            { index: 0, account: 'you@example.com' },
+            { index: 1, account: 'work.account.longname@company-domain.example' },
+          ],
+        }),
+      ),
+    });
+    const header = await page.evaluate(`
+      (() => {
+        const account = document.getElementById('account');
+        return {
+          text: account.textContent,
+          title: account.title,
+          clipped: account.scrollWidth > account.clientWidth,
+          address: document.getElementById('code-address').textContent,
+        };
+      })()
+    `);
+    check(header.text === '2 accounts', `two accounts: the header reads "${header.text}"`);
+    check(header.title.includes('work.account.longname@company-domain.example'), 'two accounts: the tooltip does not list the addresses');
+    check(!header.clipped, 'two accounts: the header is still clipped');
+    check(header.address === 'noreply@example.com → you@example.com', `two accounts: the code's mailbox reads "${header.address}"`);
+  }
+
+  {
+    const blocked = 'Chrome does not allow filling on this page';
+    await page.open('popup.html', {
+      before: stub(
+        clone({
+          tab: { id: 8, url: 'chrome://version/', site: '', title: 'About Version' },
+          __field: { ok: true, hasField: false, blocked: true, reason: blocked, refused: [] },
+          lastCode: { ...structuredClone(LAST_CODE), site: '', outcome: { ...LAST_CODE.outcome, filled: false, fillReason: 'blocked', submitted: false, pressed: '', refused: [] } },
+        }),
+      ),
+    });
+    await page.evaluate(`new Promise((resolve) => setTimeout(resolve, 200))`);
+    const chromePage = await page.evaluate(`
+      (() => ({ target: document.getElementById('target-field').textContent, rows: ${OUTCOME_ROWS} }))()
+    `);
+    check(chromePage.target === blocked, `chrome page: the target card reads "${chromePage.target}"`);
+    check(chromePage.rows[0] === blocked, `chrome page: the outcome reads ${JSON.stringify(chromePage.rows)}`);
+  }
+
+  {
+    // A page with no code box says which fields it looked at.
+    await page.open('popup.html', {
+      before: stub(
+        clone({
+          lastCode: null,
+          __field: { ok: true, hasField: false, blocked: false, refused: [{ label: 'Security code', rule: 'card field' }] },
+        }),
+      ),
+    });
+    await page.evaluate(`new Promise((resolve) => setTimeout(resolve, 200))`);
+    const target = await page.evaluate(`document.getElementById('target-field').textContent`);
+    check(
+      target === 'No code box — skipped “Security code” (card field)',
+      `refused field: the target card reads "${target}"`,
+    );
   }
 
   /* ---------------------------------------------------------------- *
@@ -222,6 +542,14 @@ export async function run(page, report) {
   check(before !== after, `popup: a real click on the auto-submit switch did not change it (stayed ${before})`);
   check(patches.includes('autoSubmit'), `popup: a real click sent no setting change: ${patches}`);
 
+  // The note under the automatic-filling switch says, before the flip, that Chrome
+  // will ask and the popup will close. Saying it afterwards is too late.
+  const note = await page.evaluate(`document.getElementById('auto-note').textContent`);
+  check(
+    /Chrome asks once/.test(note) && /popup closes/.test(note),
+    `popup: the auto-fill note does not warn about the prompt: "${note}"`,
+  );
+
   /* ---------------------------------------------------------------- *
    * The popup does not claim a copy that did not happen
    * ---------------------------------------------------------------- */
@@ -237,14 +565,22 @@ export async function run(page, report) {
       await page.open('popup.html', {
         before: stub(
           clone(
-            { __refill: { code: '482913', filled: false, fillReason: reason, copied: false } },
+            {
+              __refill: {
+                ...structuredClone(LAST_CODE),
+                filled: false,
+                fillReason: reason,
+                copied: false,
+                outcome: { ...LAST_CODE.outcome, filled: false, fillReason: reason, submitted: false, pressed: '', refused: [], copied: false },
+              },
+            },
             { autoCopy: false },
           ),
         ),
       });
       await page.evaluate(`document.getElementById('fill-button').click()`);
       await page.evaluate(`new Promise((resolve) => setTimeout(resolve, 300))`);
-      const said = await page.evaluate(`document.getElementById('status').textContent`);
+      const said = await page.evaluate(`${OUTCOME_ROWS}.join(' | ')`);
       check(
         !/copied/i.test(said),
         `popup on ${why} with copying off: said "${said}", which claims a copy that did not happen`,
@@ -415,12 +751,13 @@ export async function run(page, report) {
    * Keyboard and screen reader
    * ---------------------------------------------------------------- */
 
-  for (const [name, width, height] of [
-    ['popup.html', 380, 640],
-    ['options.html', 1024, 900],
+  for (const [name, width, height, status] of [
+    ['popup.html', 380, 640, clone()],
+    ['popup.html (held)', 380, 640, clone({ lastCode: structuredClone(HELD_CODE), guide: true })],
+    ['options.html', 1024, 900, clone()],
   ]) {
     await page.resize(width, height);
-    await page.open(name, { before: stub(clone()) });
+    await page.open(name.split(' ')[0], { before: stub(status) });
 
     // Open every disclosure first, so the controls inside one are held to the
     // same standard as the rest. Closed is not the interesting state: Chrome now

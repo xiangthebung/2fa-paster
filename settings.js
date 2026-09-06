@@ -286,6 +286,9 @@ const HISTORY_LIMIT = 12;
  * @property {number} receivedAt  When Gmail received it, epoch ms.
  * @property {number} seenAt      When we read it, epoch ms.
  * @property {number} confidence
+ * @property {string} link        Gmail's address for the message, when known.
+ * @property {string} account     Mailbox it was read from, when known.
+ * @property {boolean} siteMatch  Whether the mail was tied to the page it was found for.
  * @property {string} site        Page it was filled into, when it was.
  * @property {boolean} filled
  * @property {boolean} submitted
@@ -322,6 +325,9 @@ export function foldHistory(existing, additions, { keepMinutes, now = Date.now()
       receivedAt: Number(entry.receivedAt ?? previous?.receivedAt ?? now),
       seenAt: Number(previous?.seenAt ?? entry.seenAt ?? now),
       confidence: Number(entry.confidence ?? previous?.confidence ?? 0),
+      link: String(entry.link || previous?.link || ''),
+      account: String(entry.account || previous?.account || ''),
+      siteMatch: Boolean(entry.siteMatch || previous?.siteMatch),
       // A later sighting can only add to what is known about a row: a code that
       // was filled stays filled even if a later pass only copied it.
       site: String(entry.site || previous?.site || ''),
@@ -386,4 +392,46 @@ export async function writeWatch(watch) {
 export async function readWatch() {
   const stored = await chrome.storage.session.get(SESSION_KEYS.watch);
   return stored[SESSION_KEYS.watch] ?? null;
+}
+
+/* ------------------------------------------------------------------ *
+ * First run
+ * ------------------------------------------------------------------ */
+
+/**
+ * @typedef {object} Onboarding
+ * @property {number} firstFillAt   When the first code went into a page, epoch ms; 0 until then.
+ * @property {number} dismissedAt   When the one-time tip was closed, epoch ms; 0 until then.
+ */
+
+/**
+ * The one piece of state that has to outlive a browser session: whether the
+ * first-fill tip has been shown. It carries no code and no mail — two
+ * timestamps — and lives in `local` rather than `sync` because it is a fact
+ * about this install, not a preference.
+ *
+ * @param {unknown} raw
+ * @returns {Onboarding}
+ */
+export function normalizeOnboarding(raw) {
+  const stamp = (value) => (Number.isFinite(Number(value)) && Number(value) > 0 ? Math.trunc(Number(value)) : 0);
+  return { firstFillAt: stamp(raw?.firstFillAt), dismissedAt: stamp(raw?.dismissedAt) };
+}
+
+/** @returns {Promise<Onboarding>} */
+export async function readOnboarding() {
+  const stored = await chrome.storage.local.get('onboarding');
+  return normalizeOnboarding(stored.onboarding);
+}
+
+/** @param {Partial<Onboarding>} patch */
+export async function writeOnboarding(patch) {
+  const merged = normalizeOnboarding({ ...(await readOnboarding()), ...patch });
+  await chrome.storage.local.set({ onboarding: merged });
+  return merged;
+}
+
+/** Whether the one-time tip is due: a code has gone in, and nobody has closed it yet. */
+export function guideDue(onboarding) {
+  return Boolean(onboarding?.firstFillAt) && !onboarding?.dismissedAt;
 }

@@ -168,8 +168,17 @@ test('the page script talks only to this extension', () => {
   const content = sources.get('content.js');
   assert.doesNotMatch(content, /sendMessageExternal|onMessageExternal|chrome\.runtime\.connect\b/);
 
-  const sent = [...content.matchAll(/sendMessage\(\{\s*type:\s*'([\w-]+)'/g)].map((match) => match[1]);
-  assert.deepEqual(sent, ['code-field-seen'], 'content.js sends a message the policy does not describe');
+  // Everything it sends goes through `tell`, so the message types are read
+  // from those calls. Two, and the policy describes both: that a code box
+  // appeared, and that a button on the extension's own card was used.
+  const sent = [...new Set([...content.matchAll(/\btell\(\{\s*type:\s*'([\w-]+)'/g)].map((match) => match[1]))];
+  assert.deepEqual(sent.sort(), ['code-field-seen', 'code-used'], 'content.js sends a message the policy does not describe');
+  assert.equal(
+    (content.match(/chrome\.runtime\.sendMessage\(/g) ?? []).length,
+    1,
+    'content.js sends from somewhere other than tell()',
+  );
+  assert.match(policy, /It sends two messages, to the extension's own service worker and nowhere else/);
 });
 
 test('the policy states how much page text the script reads, and it is right', () => {
@@ -209,12 +218,19 @@ test('each storage area holds what the policy says it holds', () => {
     .filter((name) => name.startsWith('SESSION_KEYS'));
   assert.ok(session.length > 0, 'session storage is no longer keyed through SESSION_KEYS');
 
-  // Local: the signed-in addresses, and nothing else. The policy gives this one
-  // row of the table and a lifetime, and it is the only key that survives Chrome
-  // closing, so an addition here is a real change to what is kept on disk.
+  // Local: the signed-in addresses and the two first-run timestamps, and nothing
+  // else. The policy gives each a row of the table and a lifetime, and these are
+  // the only keys that survive Chrome closing, so an addition here is a real
+  // change to what is kept on disk.
   const local = [...settings.matchAll(/chrome\.storage\.local\.(?:set|get|remove)\(\s*\{?\s*'?([\w]+)/g)]
     .map((match) => match[1]);
-  assert.deepEqual([...new Set(local)], ['feedAccounts'], 'chrome.storage.local holds something new');
+  assert.deepEqual([...new Set(local)], ['feedAccounts', 'onboarding'], 'chrome.storage.local holds something new');
+  assert.match(policy, /Whether the first-run tip has been shown/, 'the policy does not disclose the first-run record');
+  assert.match(
+    settings,
+    /firstFillAt: stamp\(raw\?\.firstFillAt\), dismissedAt: stamp\(raw\?\.dismissedAt\)/,
+    'the first-run record holds something other than two timestamps',
+  );
 
   // Sync: settings only. This is the area that leaves the machine, replicated
   // through the Google account, so anything landing here is disclosed differently.

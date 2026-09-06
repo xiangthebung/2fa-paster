@@ -14,7 +14,7 @@ before any of this can go in, and it decides two paragraphs of the description.
 **2FA Paster — codes from Gmail**
 
 Verbatim from `manifest.json`, 29 characters. `short_name` is `2FA Paster`, which is
-what the toolbar and the popup show. Version 1.2.0.
+what the toolbar and the popup show. Version 1.3.0.
 
 ## Summary
 
@@ -44,16 +44,22 @@ usually within a few minutes, usually while you are switching windows to read it
 
 Open the popup or press Ctrl+Shift+2. It reads the mail that has just arrived, works
 out which number in it is the code, types that into the code box on the page and —
-unless you switch it off — presses the button that finishes the step. The code stays
-on screen while it does, so you can see for yourself whether it picked the right one.
+unless you switch it off — presses the button that finishes the step. Then it tells
+you what it did: whose mail the code came from, by address, and whether that is the
+site you are on; which field it filled; which button it pressed — "Pressed Verify" —
+and which fields it looked at and passed over, and why. The code stays on screen
+throughout, with a link to open the mail in Gmail, so you can see for yourself whether
+it picked the right one.
 
 Two ways to read your mail, and the default needs no setup at all:
 
 - **Inbox preview**, the default. Uses the Gmail session your browser is already
   signed in to. It sees unread inbox mail only, and of it only the sender, the
   subject, a snippet of the body and a time — which is where a one-time code almost
-  always is, because that is what makes a code mail useful. No account, no consent
-  screen, nothing to configure.
+  always is, because that is what makes a code mail useful. It reads the Primary tab
+  first and, when that has nothing, the Updates, Promotions, Social and Forums tabs,
+  where Gmail files a good deal of code mail. No account, no consent screen, nothing
+  to configure.
 - **Full messages**, optional. Reads whole message bodies through the Gmail API, for
   the handful of recent messages that match a code search. It exists for the case
   the preview cannot serve: a code further into the message than the snippet reaches.
@@ -77,6 +83,10 @@ scored rather than grabbed:
   site you are signing in to wins; messages that identifiably come from a *different*
   company are set aside rather than merely outscored; messages from a bulk sender
   that names nobody stay in, penalised, because they may well be from this site.
+- When nothing ties any of them to the site, the best guess is typed in — so you can
+  see it — and never submitted for you. The card on the page and the popup both read
+  "Held — check the sender", and each offers the submit, and the other codes, as one
+  click.
 - The popup shows the score and the reasons under "Why this one", so a wrong answer
   is a legible wrong answer rather than a mystery.
 
@@ -84,7 +94,9 @@ What it will not fill, at all: a password field, a card number, a CVV or expiry,
 postcode, a phone number, a search box, a promo or coupon code. Those are
 disqualified by name rather than outscored, because "security code" is what a CVV is
 called on most checkout pages and outscoring is not a strong enough guarantee for
-that.
+that. Each refusal is reported, by the field's label and the reason, so the popup can
+say "Skipped 'Security code' — card field" rather than leaving you to wonder whether
+it looked.
 
 What it will not press: anything reading as resend, cancel, dismiss, "try another
 way", or as deleting, removing, deactivating, revoking, terminating, disconnecting or
@@ -103,11 +115,21 @@ Also here:
   Unattended filling is held to a higher bar than filling you asked for: the code has
   to score above a confidence threshold, it has to be one that arrived around the time
   the box appeared, it must not already have been used, and if several codes have
-  arrived and nothing ties any of them to this site, nothing is typed in.
-- **A confirmation card on the page** after a fill, drawn in a closed shadow root the
-  page cannot read or restyle. It never repeats the code — the code is already in the
-  box in front of you. It exists so an automatic fill never looks like the site acting
-  on its own.
+  arrived and nothing ties any of them to this site, the code is typed in and held —
+  never submitted — exactly as the manual path does.
+- **A card on the page** after a fill, drawn in a closed shadow root the page cannot
+  read or restyle. It says what was filled and which button was pressed, and never
+  repeats the code — that is already in the box in front of you. When other codes
+  arrived at the same time it lists them by sender address, and one click swaps the
+  box to a different one; pressing the shortcut again brings the list back. It exists
+  so an automatic fill never looks like the site acting on its own.
+- **Nothing found** says what was read and names the ordinary reason a code is
+  missing: mail you have opened on your phone is invisible to the feed. It offers a
+  Gmail search for recent code mail, a retry once the message is marked unread, and
+  only then the full-message reader.
+- **A one-time tip** after the first fill, naming the keyboard shortcut and explaining
+  that turning on automatic filling brings a Chrome permission prompt that closes the
+  popup. Closed once, it does not return.
 - **Recent codes**, for when two services mail you inside the same minute. Each row
   names its sender and where the code went; one click puts a different one into the
   page. The list is memory-only, is capped at 12, expires after your chosen window —
@@ -152,17 +174,22 @@ Each of these is used by the shipped code, and the file that uses it is named.
   `chrome.storage.sync` holds preferences only: which reader, the freshness window,
   the toggles, the poll and watch durations, and an optional extra search term.
   `chrome.storage.local` holds the list of Gmail addresses signed in to this browser,
-  so the popup does not re-probe five account slots every two seconds.
+  so the popup does not re-probe five account slots every two seconds, and two
+  timestamps — when the first code went into a page, and when the one-time tip was
+  closed — which is all the first-run tip needs.
   `chrome.storage.session` — memory-backed, dropped when Chrome closes — holds the
-  most recent code and what it was found in, the recent-codes list (12 maximum), the
-  ids of the last 40 messages already delivered so an unattended fill cannot deliver
-  the same code twice, and the current watch.
+  most recent code, what it was found in and what was done with it (the label of the
+  field it went into, the wording of the button pressed, the fields skipped and why),
+  the recent-codes list (12 maximum), the ids of the last 40 messages already
+  delivered so an unattended fill cannot deliver the same code twice, and the current
+  watch.
 - **`activeTab`** — the manual path. Opening the popup or pressing the shortcut is
   the gesture that grants access to the current tab, which is what lets the worker
   inject the filler into it (`fillTab` in `background.js`) and ask it whether this
   page has a code box (`tabHasCodeField`, which is how the popup can say "Code box
-  found" before you press anything). Access ends with the tab and does not extend to
-  any other.
+  found" before you press anything). Pressing the shortcut again on a page it just
+  filled asks that page — same grant, same tab — to show the other codes instead of
+  fetching twice. Access ends with the tab and does not extend to any other.
 - **`scripting`** — two uses, both in `background.js`. `executeScript` injects
   `content.js` into the current tab on demand, so a page you never ask for a code on
   never runs any of this extension's script. `registerContentScripts` /
@@ -213,8 +240,9 @@ Each of these is used by the shipped code, and the file that uses it is named.
   either unregisters it. The pattern is `http`/`https` rather than `<all_urls>` so it
   matches the registered script exactly and does not quietly include `file://` pages.
   Everything the script does with that access is finding a code box and filling it: it
-  fetches nothing, and the only thing it sends anywhere is one message to this
-  extension's own worker saying that this page has a code box.
+  fetches nothing, and the only things it sends anywhere are two messages to this
+  extension's own worker: that this page has a code box, and that a button on the
+  extension's own card was used.
 - **OAuth scope `https://www.googleapis.com/auth/gmail.readonly`** — see the next
   section, which the reviewer will read first.
 
@@ -225,7 +253,8 @@ provides the popup, the toolbar badge and the tooltip. `minimum_chrome_version` 
 callers creating two offscreen documents. There is no `tabs` permission: the worker
 reads a tab's URL through `chrome.tabs.query` on the active tab, which `activeTab`
 covers, and through `chrome.tabs.onUpdated` while automatic filling holds its own
-grant.
+grant. `chrome.tabs.create`, which opens "Open in Gmail" and "Open Gmail search" in a
+new tab, needs no permission either.
 
 ## The `gmail.readonly` scope, in full
 
@@ -315,13 +344,17 @@ only these. The wording after each one is what to put in the justification box.
   and typed into the page. It is never transmitted.
 - **Personally identifiable information — yes.** Email addresses: the Gmail addresses
   signed in to this browser, kept in `chrome.storage.local` so the popup need not
-  re-probe them, and the sender's name and address on a code mail, kept in session
-  memory so the popup can say who a code came from. Neither is transmitted.
+  re-probe them, and the sender's name and address on a code mail — and, with more
+  than one account signed in, which of them it was read from — kept in session memory
+  so the popup can say who a code came from and where. Neither is transmitted.
 - **Website content — yes.** To find the code box the injected script reads each
   input's attributes and label, up to 400 characters of the text around it, and the
-  text on the form's buttons. None of it is stored or transmitted; the only message
-  the script sends is to this extension's own service worker, reporting that this page
-  has a code box.
+  text on the form's buttons. None of it is transmitted. The label of the field the
+  code went into, the wording of the button pressed and the labels of the fields
+  skipped are kept in session memory beside the code, so the popup can say what was
+  done; the only messages the script sends are to this extension's own service
+  worker, reporting that this page has a code box and that a button on the
+  extension's own card was used.
 - **Web history — yes**, in the narrow sense only, and say which. The registrable
   domain of a page a code was filled into — `github.com`, not the address — is kept
   beside that code in session memory so the recent list can say where each code went.
@@ -364,12 +397,18 @@ none should be supplied.
 4. Open any page with a one-time-code field and click **Get my code**. The code is
    found, shown with its score under "Why this one", and typed into the field. With
    "Submit it too" on, the form's own submit button is pressed; a button reading
-   "Resend code" or anything destructive is skipped.
-5. To see the optional reader, open **Settings → How it reads your mail → Full
+   "Resend code" or anything destructive is skipped. The popup then lists what was
+   done: the sender's address, the field filled, the button pressed by name, and any
+   field it skipped and why.
+5. Send two more code mails from unrelated addresses that do not name the site, and
+   press **Get my code** again. The newest is typed in but not submitted; the popup
+   and the card on the page read "Held — check the sender" and offer **Submit anyway**
+   and the other code as one click each.
+6. To see the optional reader, open **Settings → How it reads your mail → Full
    messages**. What happens next depends on the OAuth decision below; if the shipped
    build carries the placeholder client ID, this path reports that the extension has
    no client ID rather than prompting for consent.
-6. Nothing needs a network host other than Google's. The extension can be watched in
+7. Nothing needs a network host other than Google's. The extension can be watched in
    DevTools to confirm it contacts only `mail.google.com`, `gmail.googleapis.com` and
    `oauth2.googleapis.com`.
 
@@ -391,9 +430,11 @@ store.
 
 - Store icon: `dist/icons/icon-128.png` (`icons/icon-128.png` in the source tree).
 - Screenshots, all exactly 1280×800:
-  - `store-assets/01-code-1280x800.png` — the popup with a code in hand: the sender,
-    that the mail came from the site being signed in to, and "Why this one" open on
-    the score and the reasons.
+  - `store-assets/01-code-1280x800.png` — the popup's decision card: the sender's
+    address, that the mail came from the site being signed in to, the field it filled
+    and the button it pressed — both as `content.js` reported them from the fill in
+    02, which is photographed first for that reason — and "Why this one" open on the
+    score and the reasons.
   - `store-assets/02-fill-1280x800.png` — a sign-in page with the code typed into its
     field by `content.js` and the extension's own confirmation card in the corner.
   - `store-assets/03-guard-1280x800.png` — the same, on a form whose buttons include
@@ -401,7 +442,8 @@ store.
     its buttons were pressed, and the record is in the shot: Continue pressed, the
     other two not.
   - `store-assets/04-recent-1280x800.png` — three codes in the inbox at once, the
-    recent list naming each sender, and the inbox watch running.
+    recent list naming each sender under the decision card, and the inbox watch
+    running.
   - `store-assets/05-privacy-1280x800.png` — the options page's reader chooser and its
     "What this can see" panel, which is the answer to the question the scope raises.
 - Small promotional tile: `store-assets/promo-440x280.png`, exactly 440×280.
@@ -482,7 +524,8 @@ each one is a refund request or a rejection waiting to happen.
   known gap rather than as a bonus.
 - **Do not describe the scoring as certain.** It is a heuristic over wording and the
   sender. It reports how sure it is precisely because it can be wrong, and the recent
-  list exists so the user can reach the code it did not pick.
+  list, the held state and the card's "Use … instead" rows exist so the user can reach
+  the code it did not pick.
 - **Do not say it never fills the wrong field.** The strong claim it can make is the
   narrow one: fields that name a password, a card, a CVV, an expiry, a postcode, a
   phone number or a search box are disqualified outright, and anything else has to

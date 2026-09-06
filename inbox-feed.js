@@ -43,6 +43,36 @@ const FEED_ORIGIN = 'https://mail.google.com';
  */
 export const MAX_ACCOUNT_INDEX = 4;
 
+/**
+ * The inbox tabs the plain feed does not cover.
+ *
+ * With the tabbed inbox on, `feed/atom` is the Primary tab. A code mail that
+ * Gmail has filed under Updates or Promotions — which it does to plenty of
+ * transactional senders — is unread and in the inbox and still invisible to the
+ * plain feed. Each tab has its own feed under a system label, and these are the
+ * four worth asking. Primary is deliberately absent: it is what the plain feed
+ * already returned.
+ *
+ * Probed only after the plain feed has come up empty, and never allowed to fail
+ * the read: a label Gmail does not recognise answers 404, a classic inbox with no
+ * tabs answers with nothing, and an account slot that is not signed in answers
+ * with a login page. All three mean "nothing here", not "something is wrong".
+ */
+export const CATEGORY_LABELS = [
+  '^sq_ig_i_notification',
+  '^sq_ig_i_promo',
+  '^sq_ig_i_social',
+  '^sq_ig_i_group',
+];
+
+/** What each tab is called on screen, for telling the user what was checked. */
+export const CATEGORY_NAMES = {
+  '^sq_ig_i_notification': 'Updates',
+  '^sq_ig_i_promo': 'Promotions',
+  '^sq_ig_i_social': 'Social',
+  '^sq_ig_i_group': 'Forums',
+};
+
 export class FeedError extends Error {
   /** @param {'signed-out' | 'unreachable' | 'unexpected'} kind */
   constructor(kind, message) {
@@ -52,9 +82,28 @@ export class FeedError extends Error {
   }
 }
 
-/** @param {number} index */
-export function feedUrl(index = 0) {
-  return `${FEED_ORIGIN}/mail/u/${Math.max(0, Math.trunc(index))}/feed/atom`;
+/**
+ * @param {number} index   account slot
+ * @param {string} [label] a Gmail label; empty for the plain (Primary) feed
+ */
+export function feedUrl(index = 0, label = '') {
+  const base = `${FEED_ORIGIN}/mail/u/${Math.max(0, Math.trunc(index))}/feed/atom`;
+  return label ? `${base}/${label}` : base;
+}
+
+/**
+ * Gmail's own address for one message, out of the entry's `<link rel="alternate">`.
+ *
+ * Kept rather than parsed away because "open the mail this came from" is the
+ * fastest way to check a sender you do not recognise, and the feed hands the
+ * address over for free.
+ */
+function entryLink(entry) {
+  const tags = entry.match(/<link\b[^>]*>/gi) ?? [];
+  const alternate = tags.find((tag) => /\brel="alternate"/i.test(tag)) ?? tags[0];
+  const href = alternate?.match(/\bhref="([^"]*)"/i)?.[1] ?? '';
+  const decoded = decodeEntities(href).trim();
+  return decoded.startsWith(FEED_ORIGIN) ? decoded : '';
 }
 
 /** First occurrence of a tag's text content, entity-decoded. */
@@ -82,7 +131,8 @@ function accountFromTitle(title) {
  *
  * @param {string} xml
  * @returns {{ account: string, unreadCount: number,
- *             entries: Array<{ id: string, from: string, subject: string, text: string, receivedAt: number }> }}
+ *             entries: Array<{ id: string, from: string, subject: string, text: string,
+ *                              receivedAt: number, link: string }> }}
  */
 export function parseInboxFeed(xml) {
   const source = String(xml ?? '');
@@ -113,6 +163,7 @@ export function parseInboxFeed(xml) {
       // so only the snippet goes here.
       text: summary,
       receivedAt: Date.parse(issued) || 0,
+      link: entryLink(entry),
     });
   }
 
@@ -127,12 +178,12 @@ export function parseInboxFeed(xml) {
  * worker may do this cross-origin for hosts in `host_permissions`, which is
  * exactly why this work does not live in a content script.
  *
- * @param {{ index?: number, fetchImpl?: typeof fetch }} [options]
+ * @param {{ index?: number, label?: string, fetchImpl?: typeof fetch }} [options]
  */
-export async function fetchInboxFeed({ index = 0, fetchImpl = globalThis.fetch } = {}) {
+export async function fetchInboxFeed({ index = 0, label = '', fetchImpl = globalThis.fetch } = {}) {
   let response;
   try {
-    response = await fetchImpl(feedUrl(index), {
+    response = await fetchImpl(feedUrl(index, label), {
       credentials: 'include',
       // A cached feed would mean missing the code that just arrived.
       cache: 'no-store',
@@ -194,7 +245,8 @@ export async function discoverAccounts({ fetchImpl, max = MAX_ACCOUNT_INDEX } = 
  * @param {number} options.windowMinutes
  * @param {number} [options.now]
  * @param {typeof fetch} [options.fetchImpl]
- * @returns {Promise<Array<{ id: string, from: string, subject: string, text: string, receivedAt: number }>>}
+ * @returns {Promise<Array<{ id: string, from: string, subject: string, text: string,
+ *                           receivedAt: number, link: string, account: string }>>}
  */
 export async function fetchCandidateEntries({
   accounts = [{ index: 0 }],
@@ -214,15 +266,62 @@ export async function fetchCandidateEntries({
     throw feeds[0]?.reason ?? new FeedError('unreachable', 'No Gmail account could be read.');
   }
 
-  // Deduplicated by message id, because a probe for an account slot that is not
-  // signed in can be answered with the primary account's feed, which would
-  // otherwise return the same message twice.
-  const cutoff = now - windowMinutes * 60000;
-  const byId = new Map();
-  for (const entry of fulfilled.flatMap((result) => result.value.entries)) {
-    if (entry.receivedAt < cutoff) continue;
-    if (!byId.has(entry.id)) byId.set(entry.id, entry);
-  }
+  return mergeFeeds(
+    fulfilled.map((result) => result.value),
+    { cutoff: now - windowMinutes * 60000 },
+  );
+}
 
+/**
+ * The same mail, from the inbox tabs the plain feed does not cover.
+ *
+ * Every request here is allowed to fail, and a failure is an empty answer rather
+ * than an error: this runs only after the plain feed has already been read
+ * successfully and found nothing, so the session is known to be good, and the
+ * only thing a 404 or a login page from a category feed can mean is that this
+ * account has no such tab. Raising would turn "the code is not in Updates
+ * either" into "Gmail is broken", which is the wrong message.
+ *
+ * @param {object} options
+ * @param {Array<{ index: number }>} [options.accounts]
+ * @param {string[]} [options.labels]
+ * @param {number} options.windowMinutes
+ * @param {number} [options.now]
+ * @param {typeof fetch} [options.fetchImpl]
+ */
+export async function fetchCategoryEntries({
+  accounts = [{ index: 0 }],
+  labels = CATEGORY_LABELS,
+  windowMinutes,
+  now = Date.now(),
+  fetchImpl,
+}) {
+  const indexes = accounts.length > 0 ? accounts.map((account) => account.index) : [0];
+  const feeds = await Promise.allSettled(
+    indexes.flatMap((index) => labels.map((label) => fetchInboxFeed({ index, label, fetchImpl }))),
+  );
+  return mergeFeeds(
+    feeds.filter((result) => result.status === 'fulfilled').map((result) => result.value),
+    { cutoff: now - windowMinutes * 60000 },
+  );
+}
+
+/**
+ * Fresh entries across several feeds, newest first, each tagged with the mailbox
+ * it was read from.
+ *
+ * Deduplicated by message id, because a probe for an account slot that is not
+ * signed in can be answered with the primary account's feed, which would
+ * otherwise return the same message twice — and because a message can sit in
+ * more than one tab's feed.
+ */
+function mergeFeeds(feeds, { cutoff }) {
+  const byId = new Map();
+  for (const feed of feeds) {
+    for (const entry of feed.entries) {
+      if (entry.receivedAt < cutoff) continue;
+      if (!byId.has(entry.id)) byId.set(entry.id, { ...entry, account: feed.account });
+    }
+  }
   return [...byId.values()].sort((a, b) => b.receivedAt - a.receivedAt);
 }

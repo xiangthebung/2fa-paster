@@ -23,6 +23,7 @@
   --switch-off: #d6d6de;
   --radius-card: 14px;
   --radius-control: 11px;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   font-size: 13px;
 }
@@ -189,11 +190,44 @@ svg { display: block; fill: none; stroke: currentColor; stroke-linecap: round; s
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.target-copy span { color: var(--tertiary); font-size: 12px; }
+.target-copy span {
+  overflow: hidden;
+  color: var(--tertiary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .target-copy span.is-found { color: var(--success-text); }
+.target-copy span.is-blocked { color: var(--warn-text); }
 
 /* ----------------------------------------------------------------- *
- * The code
+ * First run
+ * ----------------------------------------------------------------- */
+
+.guide-card {
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+  border-radius: var(--radius-card);
+  background: var(--accent-soft);
+  color: var(--secondary);
+  font-size: 12px;
+}
+.guide-card strong { color: var(--text); font-size: 13px; font-weight: 650; }
+.guide-card b { color: var(--text); font-weight: 620; }
+.guide-card kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--separator);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text);
+  font: 620 11px/1.3 inherit;
+  white-space: nowrap;
+}
+.guide-card .link-button { justify-self: start; margin-top: 2px; }
+
+/* ----------------------------------------------------------------- *
+ * The code, and what was done with it
  * ----------------------------------------------------------------- */
 
 .code-card {
@@ -212,7 +246,7 @@ svg { display: block; fill: none; stroke: currentColor; stroke-linecap: round; s
   border-radius: var(--radius-control);
   background: none;
   color: var(--text);
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: 34px;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
@@ -223,18 +257,93 @@ svg { display: block; fill: none; stroke: currentColor; stroke-linecap: round; s
   user-select: all;
 }
 .code-value:hover { background: var(--surface-muted); }
-.code-source { color: var(--tertiary); font-size: 12px; text-align: center; }
+
+/* Who sent it: the name, then the address it actually came from. */
+.code-meta { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.code-sender { display: grid; gap: 1px; min-width: 0; }
+.code-source { color: var(--secondary); font-size: 12px; font-weight: 600; }
+.code-address {
+  color: var(--tertiary);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+.code-open { flex: 0 0 auto; padding-top: 1px; white-space: nowrap; }
+
 .code-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
+/* The sender's standing with the page: match, held, or merely unrelated. */
 .code-origin {
+  display: grid;
+  gap: 1px;
   padding: 7px 10px;
   border-radius: var(--radius-control);
   font-size: 12px;
-  font-weight: 600;
   text-align: center;
 }
+.code-origin strong { font-weight: 640; }
+.code-origin span { font-weight: 500; opacity: .85; }
 .code-origin.is-match { background: var(--success-soft); color: var(--success-text); }
 .code-origin.is-unsure { background: var(--warn-soft); color: var(--warn-text); }
+.code-origin.is-neutral { background: var(--surface-muted); color: var(--secondary); }
+
+/* What happened, one line each, with a glyph that says which kind of line. */
+.outcome-list {
+  display: grid;
+  gap: 4px;
+  padding-top: 9px;
+  border-top: 1px solid var(--separator);
+  color: var(--secondary);
+  font-size: 12px;
+}
+.outcome-list li { display: flex; align-items: flex-start; gap: 8px; overflow-wrap: anywhere; }
+.outcome-list li::before {
+  flex: 0 0 auto;
+  width: 14px;
+  color: var(--success-text);
+  content: "✓";
+  font-weight: 700;
+  text-align: center;
+}
+.outcome-list li.is-skip::before { color: var(--tertiary); content: "–"; }
+.outcome-list li.is-hold::before { color: var(--warn-text); content: "!"; }
+.outcome-list li.is-bad::before { color: var(--danger); content: "×"; }
+
+/* Held: the submit, and the other codes, each one click away. */
+.held-actions { display: grid; gap: 6px; }
+.held-alternatives { display: grid; gap: 6px; }
+.alt-button {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  text-align: left;
+}
+.alt-button:hover { background: var(--surface-hover); }
+.alt-button strong { color: var(--accent-text); font-size: 13px; font-weight: 620; }
+.alt-button strong b { font-family: var(--mono); font-weight: 650; letter-spacing: .06em; }
+.alt-button small { color: var(--tertiary); font-size: 11.5px; overflow-wrap: anywhere; }
+
+/* ----------------------------------------------------------------- *
+ * Nothing found
+ * ----------------------------------------------------------------- */
+
+.empty-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.empty-card strong { font-size: 14px; font-weight: 650; }
+.empty-card p { color: var(--secondary); font-size: 12.5px; }
+.empty-hint { color: var(--tertiary) !important; font-size: 12px !important; }
+.empty-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
+.empty-card .link-button { justify-self: start; color: var(--tertiary); }
 
 /* ----------------------------------------------------------------- *
  * Recent codes
@@ -272,7 +381,7 @@ svg { display: block; fill: none; stroke: currentColor; stroke-linecap: round; s
 .history-row:hover { background: var(--surface-muted); }
 .history-row .history-code {
   flex: 0 0 auto;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: 14px;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
@@ -458,7 +567,8 @@ svg { display: block; fill: none; stroke: currentColor; stroke-linecap: round; s
 /*
  * Space is held for the status line even when it is empty. It used to collapse,
  * which meant the first message after any action shoved the switches, the recent
- * list and everything else down by a line.
+ * list and everything else down by a line. Fill outcomes no longer land here —
+ * they are rows in the code card — so this carries errors and small confirmations.
  */
 .status-message { min-height: 2.8em; color: var(--secondary); font-size: 12px; }
 .status-message.is-error { color: var(--danger); }
@@ -492,14 +602,5 @@ svg { display: block; fill: none; stroke: currentColor; stroke-linecap: round; s
 @media (prefers-reduced-motion: reduce) {
   .pulse { animation: none; }
 }
-
-.upgrade-hint {
-  padding: 9px 12px;
-  border-radius: var(--radius-control);
-  background: var(--warn-soft, rgba(180, 110, 0, .10));
-  color: var(--warn-text);
-  font-size: 12px;
-}
-.upgrade-hint .link-button { color: var(--warn-text); text-decoration: underline; }
 
 .notice .link-button { justify-self: start; }

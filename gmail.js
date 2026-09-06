@@ -141,24 +141,30 @@ export function collectParts(payload) {
  * Turn a Gmail message resource into the flat shape the scorer wants.
  *
  * @param {object} raw
- * @returns {{ id: string, from: string, subject: string, snippet: string, text: string, receivedAt: number }}
+ * @returns {{ id: string, from: string, subject: string, snippet: string, text: string,
+ *             receivedAt: number, link: string }}
  */
 export function normalizeMessage(raw) {
   const headers = raw?.payload?.headers ?? [];
   const { plain, html } = collectParts(raw?.payload);
   const snippet = decodeEntities(raw?.snippet ?? '');
+  const id = String(raw?.id ?? '');
 
   // Prefer the real body; fall back to the snippet, which is all that is left
   // for a message whose parts are attachments or an unsupported encoding.
   const body = [plain, html].filter(Boolean).join('\n') || snippet;
 
   return {
-    id: String(raw?.id ?? ''),
+    id,
     from: header(headers, 'from'),
     subject: header(headers, 'subject'),
     snippet,
     text: body.slice(0, BODY_LIMIT),
     receivedAt: Number(raw?.internalDate) || Date.parse(header(headers, 'date')) || 0,
+    // The API hands back no web address for a message, but Gmail's own UI opens
+    // any message by its id, so one can be written. Opened by the person, in a
+    // tab; nothing here fetches it.
+    link: id ? `https://mail.google.com/mail/#all/${encodeURIComponent(id)}` : '',
   };
 }
 

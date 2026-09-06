@@ -47,7 +47,7 @@ import { fileURLToPath } from 'node:url';
 import { findChrome, open } from '../tests/browser/harness.mjs';
 import { STUB as CONTENT_STUB } from '../tests/browser/content.checks.mjs';
 import { findBestCode } from '../code-finder.js';
-import { senderName } from '../domains.js';
+import { senderAddress, senderName } from '../domains.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.join(root, 'store-assets');
@@ -140,21 +140,53 @@ const CODE = FOUND.code;
 
 const messageOf = (id) => MESSAGES.find((message) => message.id === id);
 
-/** `deliver` shape: what the popup renders as the code in hand. */
+/**
+ * `deliver` shape: what the popup renders as the code in hand.
+ *
+ * `outcome` — what was filled, what was pressed, what was skipped — is filled in
+ * by `main` from the reply `content.js` gives when it fills the sign-in page
+ * for frame 02, so the decision card in frame 01 describes the fill in frame
+ * 02 rather than a fill somebody typed up.
+ */
 const LAST_CODE = {
   code: FOUND.code,
   messageId: FOUND.messageId,
   from: FOUND.from,
+  address: senderAddress(FOUND.from),
   subject: FOUND.subject,
   senderSite: FOUND.senderSite,
   receivedAt: FOUND.receivedAt,
+  // Where "Open in Gmail" would go. Invented like the mail; nothing opens it.
+  link: 'https://mail.google.com/mail/u/0/#inbox/invented',
+  account: 'you@example.com',
   foundAt: NOW,
   confidence: FOUND.confidence,
   reasons: FOUND.reasons,
   siteMatch: FOUND.siteMatch,
   ambiguous: FOUND.ambiguous,
+  held: false,
   site: SITE,
+  outcome: null,
 };
+
+/** The decision card's record of a fill, from what `content.js` replied. */
+function outcomeOf(result) {
+  return {
+    filled: true,
+    fillReason: '',
+    kind: result.kind,
+    boxes: result.boxes,
+    label: result.label,
+    submitted: Boolean(result.submitted),
+    submitKind: result.submitKind,
+    pressed: result.pressed,
+    held: false,
+    submitWanted: true,
+    refused: result.refused ?? [],
+    copied: true,
+    error: '',
+  };
+}
 
 /** `noteHistory` shape: the winner, filled, plus everything else that turned up. */
 const HISTORY = [
@@ -167,6 +199,9 @@ const HISTORY = [
     receivedAt: FOUND.receivedAt,
     seenAt: NOW,
     confidence: FOUND.confidence,
+    link: LAST_CODE.link,
+    account: LAST_CODE.account,
+    siteMatch: FOUND.siteMatch,
     site: SITE,
     filled: true,
     submitted: true,
@@ -180,6 +215,9 @@ const HISTORY = [
     receivedAt: other.receivedAt,
     seenAt: NOW,
     confidence: other.confidence,
+    link: '',
+    account: LAST_CODE.account,
+    siteMatch: other.siteMatch,
     site: '',
     filled: false,
     submitted: false,
@@ -224,6 +262,7 @@ const BASE_STATUS = {
   history: HISTORY,
   watching: null,
   autoGranted: true,
+  guide: false,
   extensionId: 'storeassetsplaceholderextensionid',
   tab: { id: 1, url: `https://${SITE}/sign-in`, site: SITE, title: 'Orchard Post — Sign in' },
 };
@@ -250,7 +289,7 @@ function stub(state) {
             Object.assign(status.settings, message.patch);
             return { ok: true, settings: structuredClone(status.settings) };
           }
-          if (message.type === 'has-field') return { ok: true, hasField: true };
+          if (message.type === 'has-field') return { ok: true, hasField: true, blocked: false, refused: [] };
           return { ok: true };
         },
       },
@@ -623,6 +662,8 @@ async function shootFill(page, route, { width, height }) {
       submit: true,
       toast: true,
       sender: senderName(messageOf('invented-orchard').from),
+      address: senderAddress(messageOf('invented-orchard').from),
+      site: SITE,
     })})`,
   );
   if (!result?.filled) {
@@ -669,11 +710,23 @@ async function main() {
       { name: 'prefers-reduced-motion', value: 'reduce' },
     ]);
 
-    /* -- 01: the code, and why it is that one ---------------------- */
+    /* -- 02: the fill ---------------------------------------------- */
+
+    // Photographed first, because frame 01's decision card is written from
+    // this fill's reply: the field it filled and the button it pressed, as
+    // `content.js` names them.
+    const fill = await shootFill(page, 'demo/sign-in.html', { width: 980, height: 586 });
+    pages.set('shots/fill.png', png(fill.shot));
+    const delivered = { ...LAST_CODE, outcome: outcomeOf(fill.result) };
+    if (delivered.outcome.pressed !== 'Verify and continue') {
+      throw new Error(`store-shots: the sign-in page's button was reported as "${delivered.outcome.pressed}"`);
+    }
+
+    /* -- 01: the code, and what was done with it ------------------- */
 
     const codeShot = await shootPopup(
       page,
-      status({ watching: null }),
+      status({ watching: null, lastCode: delivered }),
       `document.getElementById('code-why').open = true`,
     );
     pages.set('shots/popup-code.png', png(codeShot.shot));
@@ -682,28 +735,25 @@ async function main() {
       page,
       '01-code-1280x800',
       splitFrame({
-        eyebrow: 'The code, and why that one',
+        eyebrow: 'The code, and what was done with it',
         title: 'The newest code from your inbox, without leaving the page',
         note:
           'Open the popup, or press the shortcut. 2FA Paster reads the mail that just arrived, ' +
-          'picks the number that is actually a one-time code, and says how sure it is.',
+          'picks the number that is actually a one-time code, and says whose mail it came from, ' +
+          'what it filled, and which button it pressed.',
         points: [
+          'Names the sender’s address, and whether it is the site you are on',
           'Scored rather than grabbed — and it shows the reasons for the score',
-          'Knows an order number, a year, a price and a phone number are not codes',
-          'Prefers the mail that came from the site you are signing in to',
-          'Fill the page, or copy — the code is on screen either way',
+          'Says what was filled, what was pressed, and what was skipped and why',
+          'A code nothing ties to the site goes in, but is never submitted for you',
         ],
         foot:
           'Interface rendered by the shipped build. The mail behind this picture is invented and the ' +
-          'sender does not exist — but the score and the reasons are computed by the extension’s own scorer.',
+          'sender does not exist — but the score, the reasons and the card’s record of the fill are the ' +
+          'extension’s own.',
         shots: ['/shots/popup-code.png'],
       }),
     );
-
-    /* -- 02: the fill ---------------------------------------------- */
-
-    const fill = await shootFill(page, 'demo/sign-in.html', { width: 980, height: 586 });
-    pages.set('shots/fill.png', png(fill.shot));
 
     await frame(
       page,
@@ -744,7 +794,7 @@ async function main() {
 
     const recentShot = await shootPopup(
       page,
-      status({ watching: { tabId: 1, origin: SITE, startedAt: NOW, until: NOW + 96000 } }),
+      status({ watching: { tabId: 1, origin: SITE, startedAt: NOW, until: NOW + 96000 }, lastCode: delivered }),
       `document.getElementById('history-card').open = true`,
     );
     pages.set('shots/popup-recent.png', png(recentShot.shot));

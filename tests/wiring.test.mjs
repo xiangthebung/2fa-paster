@@ -118,20 +118,27 @@ test('every message the UI sends has a handler in the service worker', () => {
   }
 });
 
-test('the service worker handles the message the injected script sends', () => {
-  const sent = unique(matchAll(sources.content, /sendMessage\(\{\s*type:\s*'([\w-]+)'/g));
-  assert.deepEqual(sent, ['code-field-seen']);
+test('the service worker handles every message the injected script sends', () => {
+  // content.js sends through one helper, `tell`, so its message types are read
+  // from the calls to that — and the helper has to stay the only sender.
+  const sent = unique(matchAll(sources.content, /\btell\(\{\s*type:\s*'([\w-]+)'/g));
+  assert.deepEqual(sent.sort(), ['code-field-seen', 'code-used']);
+  assert.equal(
+    matchAll(sources.content, /(chrome\.runtime\.sendMessage)\(/g).length,
+    1,
+    'content.js should send every message through tell()',
+  );
   for (const type of sent) {
     assert.ok(
-      sources.background.includes(`'${type}'`),
-      `content.js sends "${type}", which background.js does not mention`,
+      sources.background.includes(`message?.type === '${type}'`),
+      `content.js sends "${type}", which background.js does not route`,
     );
   }
 });
 
 test('the injected script handles every message the service worker sends it', () => {
   const sent = unique(matchAll(sources.background, /sendMessage\(\s*\w+,\s*\{\s*type:\s*'([\w-]+)'/g));
-  assert.deepEqual(sent.sort(), ['fill-code', 'has-code-field']);
+  assert.deepEqual(sent.sort(), ['fill-code', 'has-code-field', 'show-picker', 'submit-code', 'why-no-field']);
   for (const type of sent) {
     assert.ok(
       sources.content.includes(`=== '${type}'`),

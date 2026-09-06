@@ -61,16 +61,43 @@
             <kbd id="shortcut-hint" class="shortcut-key" hidden></kbd>
           </button>
 
+          <!--
+            Shown once, after the first code has gone into a page: the two things
+            worth knowing that the button cannot tell you. Closed with "Got it"
+            and never shown again.
+          -->
+          <section id="guide-card" class="guide-card" aria-labelledby="guide-title" hidden>
+            <strong id="guide-title">Next time, skip the popup</strong>
+            <p id="guide-shortcut">Press <kbd id="guide-key">Ctrl+Shift+2</kbd> on the page and the code goes straight in.</p>
+            <p id="guide-auto">
+              Or turn on <b>Fill it in automatically</b> below and it lands in the box on its own when the mail
+              arrives. Chrome asks once for permission to run on the sites you visit; the popup closes while it asks.
+            </p>
+            <button id="guide-dismiss" class="link-button" type="button">Got it</button>
+          </section>
+
+          <!--
+            The decision card. Not "a code was found" but what was done with it:
+            who sent it and whether that is the site in front of you, what was
+            filled, what was pressed, what was skipped and why — and, when the
+            sender could not be tied to the page, that the submit was held.
+          -->
           <section id="code-card" class="code-card" aria-labelledby="code-heading" hidden>
             <h2 id="code-heading" class="visually-hidden">The code that was found</h2>
             <button id="code-value" class="code-value" type="button" title="Click to copy"></button>
-            <p id="code-source" class="code-source"></p>
-            <!--
-              Said out loud only when it is worth saying: that the mail came from
-              the site you are on, or that nothing tied it to any site. Silent in
-              between, which is most of the time.
-            -->
+            <div class="code-meta">
+              <span class="code-sender">
+                <span id="code-source" class="code-source"></span>
+                <span id="code-address" class="code-address"></span>
+              </span>
+              <button id="open-mail" class="link-button code-open" type="button" hidden>Open in Gmail ↗</button>
+            </div>
             <p id="code-origin" class="code-origin" hidden></p>
+            <ul id="code-outcome" class="outcome-list" aria-label="What was done" hidden></ul>
+            <div id="held-actions" class="held-actions" hidden>
+              <button id="submit-anyway" class="primary-button" type="button">Submit anyway</button>
+              <div id="held-alternatives" class="held-alternatives"></div>
+            </div>
             <div class="code-actions">
               <button id="copy-button" class="secondary-button" type="button">Copy</button>
               <button id="fill-button" class="secondary-button" type="button">Fill this page</button>
@@ -83,6 +110,27 @@
               </summary>
               <ul id="code-reasons" class="reason-list"></ul>
             </details>
+          </section>
+
+          <!--
+            Nothing found. Says what was read — unread Primary mail, and the other
+            inbox tabs — and names the two ordinary reasons a code is not there,
+            with something to press for each. The full-message reader is the
+            answer to a third, rarer reason, so it is the quiet link at the end
+            rather than the headline.
+          -->
+          <section id="empty-card" class="empty-card" aria-labelledby="empty-title" hidden>
+            <strong id="empty-title">Nothing found</strong>
+            <p id="empty-body"></p>
+            <p class="empty-hint">
+              Read it on your phone already? Mail you have opened is invisible here — mark it unread in
+              Gmail, then try again.
+            </p>
+            <div class="empty-actions">
+              <button id="open-search" class="secondary-button" type="button">Open Gmail search</button>
+              <button id="retry-button" class="secondary-button" type="button">Try again</button>
+            </div>
+            <button id="upgrade-button" class="link-button" type="button">Read whole messages instead</button>
           </section>
 
           <p id="status" class="status-message" role="status" aria-live="polite"></p>
@@ -139,16 +187,6 @@
             <span class="pulse" aria-hidden="true"></span>
             <span id="watch-text">Watching your inbox…</span>
             <button id="stop-watch-button" class="link-button" type="button">Stop</button>
-          </p>
-
-          <!--
-            Offered only after a search comes up empty on the feed, because that is
-            the one failure the full-text reader actually fixes: a code sitting
-            further into the message than the feed's preview reaches.
-          -->
-          <p id="upgrade-hint" class="upgrade-hint" hidden>
-            Not finding it? The preview only covers the first line or two.
-            <button id="upgrade-button" class="link-button" type="button">Read full messages instead</button>
           </p>
         </div>
       </main>

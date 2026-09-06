@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { DEFAULTS, foldHistory, normalizeSettings } from '../settings.js';
+import { DEFAULTS, foldHistory, guideDue, normalizeOnboarding, normalizeSettings } from '../settings.js';
 
 test('an empty store yields the defaults', () => {
   assert.deepEqual(normalizeSettings(), DEFAULTS);
@@ -152,6 +152,30 @@ test('the list is capped even inside the window', () => {
   assert.equal(list[0].code, '100000');
 });
 
+test('a row keeps where its mail can be opened and which mailbox it came from', () => {
+  const now = Date.now();
+  const first = foldHistory(
+    [],
+    [seen({ receivedAt: now, seenAt: now, link: 'https://mail.google.com/mail?message_id=1', account: 'a@gmail.com', siteMatch: true })],
+    { keepMinutes: 30, now },
+  );
+  assert.equal(first[0].link, 'https://mail.google.com/mail?message_id=1');
+  assert.equal(first[0].account, 'a@gmail.com');
+  assert.equal(first[0].siteMatch, true);
+
+  // A later sighting that does not carry them does not erase them.
+  const second = foldHistory(first, [seen({ receivedAt: now, seenAt: now })], { keepMinutes: 30, now });
+  assert.equal(second[0].link, 'https://mail.google.com/mail?message_id=1');
+  assert.equal(second[0].account, 'a@gmail.com');
+  assert.equal(second[0].siteMatch, true);
+
+  // And a row that never had them is well-formed rather than undefined.
+  const bare = foldHistory([], [seen({ receivedAt: now, seenAt: now })], { keepMinutes: 30, now });
+  assert.equal(bare[0].link, '');
+  assert.equal(bare[0].account, '');
+  assert.equal(bare[0].siteMatch, false);
+});
+
 test('junk rows are dropped rather than stored half-formed', () => {
   const now = Date.now();
   const list = foldHistory([null, { code: '' }, 'nonsense'], [seen({ receivedAt: now })], {
@@ -160,4 +184,23 @@ test('junk rows are dropped rather than stored half-formed', () => {
   });
   assert.equal(list.length, 1);
   assert.equal(typeof list[0].confidence, 'number');
+});
+
+/* ------------------------------------------------------------------ *
+ * The first-run tip
+ * ------------------------------------------------------------------ */
+
+test('the first-run tip is due after the first fill and never again once closed', () => {
+  assert.deepEqual(normalizeOnboarding(undefined), { firstFillAt: 0, dismissedAt: 0 });
+  // Two timestamps and nothing else, whatever storage held.
+  assert.deepEqual(normalizeOnboarding({ firstFillAt: 'soon', dismissedAt: -5, code: '123456' }), {
+    firstFillAt: 0,
+    dismissedAt: 0,
+  });
+  assert.deepEqual(normalizeOnboarding({ firstFillAt: 1000.9, dismissedAt: '2000' }), { firstFillAt: 1000, dismissedAt: 2000 });
+
+  assert.equal(guideDue(normalizeOnboarding({})), false, 'nothing has been filled yet');
+  assert.equal(guideDue({ firstFillAt: 1000, dismissedAt: 0 }), true, 'a code went in and nobody has closed the tip');
+  assert.equal(guideDue({ firstFillAt: 1000, dismissedAt: 2000 }), false, 'closed is closed');
+  assert.equal(guideDue(null), false);
 });

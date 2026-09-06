@@ -35,6 +35,40 @@
 export const STUB = `(() => {
   window.__reports = [];
   window.__listenerCount = 0;
+
+  // The card is drawn in a closed shadow root, which is the point of it: no page
+  // script can reach in. The checks below still have to read it, so the root is
+  // caught on its way past — installed before content.js runs, in the test only.
+  // The root stays closed; \`host.shadowRoot\` is still null, and a check asserts it.
+  window.__shadowRoots = [];
+  const attachShadow = Element.prototype.attachShadow;
+  Element.prototype.attachShadow = function (init) {
+    const root = attachShadow.call(this, init);
+    window.__shadowRoots.push(root);
+    return root;
+  };
+  const cardRoot = () => window.__shadowRoots.findLast((root) => root.host?.isConnected);
+  window.__card = () => {
+    const card = cardRoot()?.querySelector('.card');
+    if (!card) return null;
+    const text = (selector) => card.querySelector(selector)?.textContent ?? '';
+    return {
+      title: text('.title'),
+      detail: text('.detail'),
+      note: text('.note'),
+      heading: text('.picker-title'),
+      rows: [...card.querySelectorAll('.row')].map((row) => row.textContent),
+      buttons: [...card.querySelectorAll('button')].map((button) => button.textContent),
+      text: card.textContent,
+    };
+  };
+  window.__cardClick = (label) => {
+    const button = [...(cardRoot()?.querySelectorAll('button') ?? [])].find((b) => b.textContent.includes(label));
+    if (!button) return false;
+    button.click();
+    return true;
+  };
+
   window.chrome = {
     runtime: {
       id: 'browsertestextensionidbrowsertest',
@@ -117,9 +151,68 @@ export async function run(page, report) {
     check(value === CODE, `otp-login: the field holds "${value}", expected "${CODE}"`);
 
     check(filled?.submitKind === 'clicked', `otp-login: submitted by "${filled?.submitKind}", expected a click`);
+    // The reply names what it did, in the words the page uses, so the popup can
+    // say "Filled 'Verification code'" and "Pressed Verify" rather than "done".
+    check(filled?.pressed === 'Verify', `otp-login: the reply says "${filled?.pressed}" was pressed, expected "Verify"`);
+    check(filled?.label === 'Verification code', `otp-login: the reply names the field "${filled?.label}"`);
+    check(JSON.stringify(filled?.refused) === '[]', `otp-login: nothing was skipped, but the reply lists ${JSON.stringify(filled?.refused)}`);
     const clicked = await page.evaluate(`JSON.stringify(window.__clicked ?? [])`);
     check(clicked === '["Verify"]', `otp-login: clicked ${clicked}, expected only Verify`);
     check(await page.evaluate(`window.__submitted === true`), 'otp-login: the form was never submitted');
+  }
+
+  /* ---------------------------------------------------------------- *
+   * It says what it skipped, and why
+   * ---------------------------------------------------------------- */
+
+  {
+    // A card confirmation: card number, a CVV labelled "Security code", and the
+    // one-time code box beside them. The code has to land in the right box, and
+    // the reply has to name the box that was passed over and the rule that
+    // caught it — that is what the popup turns into "Skipped 'Security code' —
+    // card field". The card number is not reported: it never called itself a
+    // code, so nobody needs telling it was not filled with one.
+    const skipped = [{ label: 'Security code', rule: 'card field' }];
+    await page.open('fixtures/payment-otp.html', { before: STUB });
+
+    const seen = await ask(page, { type: 'has-code-field' });
+    check(
+      seen?.hasField === true && seen?.label === 'Verification code',
+      `payment-otp: has-code-field answered ${JSON.stringify(seen)}`,
+    );
+    check(
+      JSON.stringify(seen?.refused) === JSON.stringify(skipped),
+      `payment-otp: has-code-field reports ${JSON.stringify(seen?.refused)} as skipped`,
+    );
+
+    const filled = await ask(page, fillMessage());
+    check(filled?.filled === true && filled?.label === 'Verification code', `payment-otp: fill reported ${JSON.stringify(filled)}`);
+    check(
+      filled?.pressed === 'Verify' && filled?.submitKind === 'clicked',
+      `payment-otp: pressed "${filled?.pressed}" by "${filled?.submitKind}", expected a click on Verify`,
+    );
+    check(
+      JSON.stringify(filled?.refused) === JSON.stringify(skipped),
+      `payment-otp: the fill reply lists ${JSON.stringify(filled?.refused)} as skipped`,
+    );
+    const values = await page.evaluate(
+      `JSON.stringify(['cardnumber', 'cvv', 'code'].map((id) => document.getElementById(id).value))`,
+    );
+    check(values === JSON.stringify(['', '', CODE]), `payment-otp: the fields hold ${values}`);
+  }
+
+  {
+    // With no code box anywhere, the top frame still answers `why-no-field`
+    // with the fields it looked at, so "no code box found" can say which ones.
+    await page.open('fixtures/checkout.html', { before: STUB });
+    const why = await ask(page, { type: 'why-no-field' });
+    const rules = (why?.refused ?? []).map((entry) => `${entry.label} — ${entry.rule}`);
+    check(rules[0] === 'Security code — card field', `checkout why-no-field: the first refusal is "${rules[0]}"`);
+    check(rules.includes('Post code — postcode field'), `checkout why-no-field: ${JSON.stringify(rules)} does not name the postcode`);
+    check(
+      !rules.some((rule) => rule.startsWith('Card number')),
+      `checkout why-no-field: a field that never called itself a code is reported: ${JSON.stringify(rules)}`,
+    );
   }
 
   /* ---------------------------------------------------------------- *
@@ -309,6 +402,183 @@ export async function run(page, report) {
     check(toast?.openRoot === false, 'toast: the shadow root is open, so page script can read it');
     check(!toast?.html.includes(CODE), 'toast: the markup contains the code itself');
     check(!toast?.bodyText.includes(CODE), 'toast: the code is rendered as page text');
+
+    const card = await page.evaluate(`window.__card()`);
+    check(card?.title === 'Code filled in', `toast: the card's title reads "${card?.title}"`);
+    check(!card?.text.includes(CODE), 'toast: the card shows the code that is already in the box');
+    check(card?.rows.length === 0, `toast: with nothing else in the inbox the card offers ${JSON.stringify(card?.rows)}`);
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Held: filled, never submitted, and two ways to finish
+   * ---------------------------------------------------------------- */
+
+  const heldMessage = () =>
+    fillMessage({ hold: true, toast: true, address: 'noreply@accountprotection.net', site: 'example.com' });
+
+  {
+    // Several codes arrived and none is tied to this site: the code goes in,
+    // because seeing it in the box is how you judge it, and the button is left
+    // alone, because pressing it with the wrong code is what locks an account.
+    await page.open('fixtures/otp-login.html', { before: STUB });
+    const held = await ask(page, heldMessage());
+    check(held?.filled === true && held?.held === true, `held: fill reported ${JSON.stringify(held)}`);
+    check(held?.submitted === false && held?.pressed === '', `held: submitted anyway (${held?.submitKind} "${held?.pressed}")`);
+    check(await page.evaluate(`JSON.stringify(window.__clicked ?? [])`) === '[]', 'held: a button was pressed');
+    check(await page.evaluate(`document.getElementById('code').value`) === CODE, 'held: the code was not typed in');
+
+    const card = await page.evaluate(`window.__card()`);
+    check(card?.title === 'Held — check the sender', `held: the card's title reads "${card?.title}"`);
+    check(/noreply@accountprotection\.net/.test(card?.detail ?? ''), `held: the card does not name the address: "${card?.detail}"`);
+    check(/none name example\.com/.test(card?.note ?? ''), `held: the card's note reads "${card?.note}"`);
+    check(card?.buttons.includes('Submit anyway'), `held: the card offers ${JSON.stringify(card?.buttons)}`);
+
+    // The popup's "Submit anyway" arrives as `submit-code`: the same button the
+    // fill would have pressed, and the reply names it.
+    const submitted = await ask(page, { type: 'submit-code' });
+    check(
+      submitted?.submitted === true && submitted?.pressed === 'Verify' && submitted?.submitKind === 'clicked',
+      `held: submit-code answered ${JSON.stringify(submitted)}`,
+    );
+    check(await page.evaluate(`JSON.stringify(window.__clicked ?? [])`) === '["Verify"]', 'held: Verify was not the button pressed');
+    const after = await page.evaluate(`window.__card()`);
+    check(after?.title === 'Submitted — Verify pressed', `held: after the submit the card reads "${after?.title}"`);
+    check(!after?.buttons.includes('Submit anyway'), 'held: the card still offers "Submit anyway" after submitting');
+  }
+
+  {
+    // The card's own "Submit anyway": the same press, and the worker is told so
+    // the popup opened afterwards describes what happened.
+    await page.open('fixtures/otp-login.html', { before: STUB });
+    await ask(page, heldMessage());
+    check(await page.evaluate(`window.__cardClick('Submit anyway')`), 'card submit: no "Submit anyway" button to press');
+    await page.evaluate(`new Promise((resolve) => setTimeout(resolve, 500))`);
+    const clicked = await page.evaluate(`JSON.stringify(window.__clicked ?? [])`);
+    check(clicked === '["Verify"]', `card submit: clicked ${clicked}`);
+    const told = await page.evaluate(`JSON.stringify(window.__reports.filter((m) => m.type === 'code-used'))`);
+    check(
+      /"action":"submitted"/.test(told) && /"submitted":true/.test(told) && /"pressed":"Verify"/.test(told),
+      `card submit: the worker was told ${told}`,
+    );
+  }
+
+  {
+    // A frame that never filled anything stays silent on `submit-code`, for the
+    // same reason it stays silent on a fill: the frame that did the fill answers.
+    await page.open('fixtures/otp-login.html', { before: STUB });
+    const silent = await ask(page, { type: 'submit-code' });
+    check(silent === null, `submit-code with nothing filled replied ${JSON.stringify(silent)} instead of staying silent`);
+    check(await page.evaluate(`JSON.stringify(window.__clicked ?? [])`) === '[]', 'submit-code with nothing filled pressed a button');
+  }
+
+  /* ---------------------------------------------------------------- *
+   * The picker on the page
+   * ---------------------------------------------------------------- */
+
+  {
+    // Other codes arrived at the same time: the card lists them by address, one
+    // click swaps the field's value, and the worker is told which code went in.
+    const other = { code: '771204', sender: 'Security', address: 'bounce@sendgrid.net', receivedAt: Date.now() - 60000 };
+    await page.open('fixtures/otp-login.html', { before: STUB });
+    const filled = await ask(
+      page,
+      fillMessage({ submit: false, toast: true, address: 'noreply@example.com', alternatives: [other] }),
+    );
+    check(filled?.filled === true, `picker: fill reported ${JSON.stringify(filled)}`);
+
+    const card = await page.evaluate(`window.__card()`);
+    check(card?.heading === 'Other recent codes', `picker: the heading reads "${card?.heading}"`);
+    check(
+      card?.rows.length === 1 && /Use 771204 instead/.test(card.rows[0]) && /bounce@sendgrid\.net/.test(card.rows[0]),
+      `picker: the rows read ${JSON.stringify(card?.rows)}`,
+    );
+    check(!card?.text.includes(CODE), 'picker: the card shows the code that is already in the box');
+
+    check(await page.evaluate(`window.__cardClick('771204')`), 'picker: no row to click');
+    await page.evaluate(`new Promise((resolve) => setTimeout(resolve, 400))`);
+    const value = await page.evaluate(`document.getElementById('code').value`);
+    check(value === '771204', `picker: after the swap the field holds "${value}"`);
+    const swapped = await page.evaluate(`window.__card()`);
+    check(swapped?.title === 'Swapped in', `picker: after the swap the card reads "${swapped?.title}"`);
+    check(
+      swapped?.rows.some((row) => row.includes(CODE)),
+      `picker: the code that was replaced is not offered back: ${JSON.stringify(swapped?.rows)}`,
+    );
+    const told = await page.evaluate(`JSON.stringify(window.__reports.filter((m) => m.type === 'code-used'))`);
+    check(/"action":"swapped"/.test(told) && /"code":"771204"/.test(told), `picker: the worker was told ${told}`);
+    check(await page.evaluate(`JSON.stringify(window.__clicked ?? [])`) === '[]', 'picker: a swap with submitting off pressed a button');
+  }
+
+  {
+    // With submitting on, a chosen code is delivered the way a chosen code is:
+    // the person picked it, so the sender question is settled and it goes through.
+    const other = { code: '771204', sender: 'Security', address: 'bounce@sendgrid.net', receivedAt: Date.now() - 60000 };
+    await page.open('fixtures/otp-login.html', { before: STUB });
+    await ask(page, heldMessage());
+    // Redraw with a row to pick: the held card carries the alternatives it was given.
+    await page.open('fixtures/otp-login.html', { before: STUB });
+    await ask(page, fillMessage({ ...heldMessage(), alternatives: [other] }));
+    check(await page.evaluate(`window.__cardClick('771204')`), 'picker (held): no row to click');
+    await page.evaluate(`new Promise((resolve) => setTimeout(resolve, 500))`);
+    const clicked = await page.evaluate(`JSON.stringify(window.__clicked ?? [])`);
+    check(clicked === '["Verify"]', `picker (held): picking a code with submitting on clicked ${clicked}, expected Verify`);
+    const swapped = await page.evaluate(`window.__card()`);
+    check(swapped?.title === 'Swapped in, Verify pressed', `picker (held): the card reads "${swapped?.title}"`);
+  }
+
+  /* ---------------------------------------------------------------- *
+   * The shortcut pressed again
+   * ---------------------------------------------------------------- */
+
+  {
+    // A second press of the shortcut on a page that was just filled asks the
+    // page to put its card back up with the other codes. Only a frame holding a
+    // fill answers: an untouched page stays silent, and the worker fetches.
+    const other = { code: '771204', sender: 'Security', address: 'bounce@sendgrid.net', receivedAt: Date.now() - 60000 };
+    const same = { code: CODE, sender: 'Example', address: 'noreply@example.com', receivedAt: Date.now() - 20000 };
+    await page.open('fixtures/otp-login.html', { before: STUB });
+    const silent = await ask(page, { type: 'show-picker', rows: [other] });
+    check(silent === null, `second press: an unfilled page answered ${JSON.stringify(silent)} instead of staying silent`);
+    check((await page.evaluate(`window.__card()`)) === null, 'second press: an unfilled page drew a card');
+
+    await ask(page, fillMessage({ submit: false, toast: false, address: 'noreply@example.com' }));
+    check((await page.evaluate(`window.__card()`)) === null, 'second press: a fill with the card switched off drew one anyway');
+    const shown = await ask(page, { type: 'show-picker', rows: [same, other] });
+    check(shown?.shown === true, `second press: show-picker answered ${JSON.stringify(shown)}`);
+    const card = await page.evaluate(`window.__card()`);
+    check(card?.title === 'Already filled in', `second press: the card's title reads "${card?.title}"`);
+    check(/noreply@example\.com/.test(card?.detail ?? ''), `second press: the card does not name the address: "${card?.detail}"`);
+    check(card?.heading === 'Other recent codes', `second press: the picker's heading reads "${card?.heading}"`);
+    check(
+      card?.rows.length === 1 && /Use 771204 instead/.test(card.rows[0]) && /bounce@sendgrid\.net/.test(card.rows[0]),
+      `second press: the rows read ${JSON.stringify(card?.rows)} — the code already in the box must not be offered`,
+    );
+    check(!card?.buttons.includes('Submit anyway'), 'second press: a fill with submitting off offers "Submit anyway"');
+
+    check(await page.evaluate(`window.__cardClick('771204')`), 'second press: no row to click');
+    await page.evaluate(`new Promise((resolve) => setTimeout(resolve, 400))`);
+    const value = await page.evaluate(`document.getElementById('code').value`);
+    check(value === '771204', `second press: after the swap the field holds "${value}"`);
+
+    // Pressed once more with nothing else to offer: the card says so.
+    const again = await ask(page, { type: 'show-picker', rows: [] });
+    check(again?.shown === true, `second press (nothing new): show-picker answered ${JSON.stringify(again)}`);
+    const bare = await page.evaluate(`window.__card()`);
+    check(bare?.note === 'No other code has arrived.', `second press (nothing new): the card's note reads "${bare?.note}"`);
+    check(bare?.rows.length === 0, `second press (nothing new): the card offers ${JSON.stringify(bare?.rows)}`);
+  }
+
+  {
+    // A held code, pressed again: the held card comes back, submit still on offer,
+    // and still nothing pressed.
+    await page.open('fixtures/otp-login.html', { before: STUB });
+    await ask(page, heldMessage());
+    const shown = await ask(page, { type: 'show-picker', rows: [] });
+    check(shown?.shown === true, `second press (held): show-picker answered ${JSON.stringify(shown)}`);
+    const card = await page.evaluate(`window.__card()`);
+    check(card?.title === 'Held — check the sender', `second press (held): the card's title reads "${card?.title}"`);
+    check(card?.buttons.includes('Submit anyway'), `second press (held): the card offers ${JSON.stringify(card?.buttons)}`);
+    check((await page.evaluate(`JSON.stringify(window.__clicked ?? [])`)) === '[]', 'second press (held): a button was pressed');
   }
 
   /* ---------------------------------------------------------------- *

@@ -12,10 +12,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  CATEGORY_LABELS,
+  CATEGORY_NAMES,
   FeedError,
   discoverAccounts,
   feedUrl,
   fetchCandidateEntries,
+  fetchCategoryEntries,
   fetchInboxFeed,
   parseInboxFeed,
 } from '../inbox-feed.js';
@@ -305,6 +308,123 @@ test('every mailbox failing does raise', async () => {
       }),
     FeedError,
   );
+});
+
+test('candidates say which mailbox they were read from', async () => {
+  const now = Date.parse('2026-07-29T12:00:00Z');
+  const entries = await fetchCandidateEntries({
+    accounts: [{ index: 0 }, { index: 1 }],
+    windowMinutes: 10,
+    now,
+    fetchImpl: fakeAccounts({
+      0: feedXml({ account: 'first@gmail.com', entries: [entryXml({ subject: 'Your code 111111', id: 'tag:a' })] }),
+      1: feedXml({ account: 'second@gmail.com', entries: [entryXml({ subject: 'Your code 222222', id: 'tag:b' })] }),
+    }),
+  });
+  assert.deepEqual(
+    entries.map((entry) => [entry.id, entry.account]),
+    [
+      ['tag:a', 'first@gmail.com'],
+      ['tag:b', 'second@gmail.com'],
+    ],
+  );
+});
+
+test("each entry keeps Gmail's own address for the message", () => {
+  const feed = parseInboxFeed(feedXml({ entries: [entryXml({ subject: 'Your code' })] }));
+  assert.equal(feed.entries[0].link, 'https://mail.google.com/mail?view=conv');
+
+  // The real feed entity-encodes the query string; it decodes.
+  const encoded = feedXml({ entries: [entryXml({ subject: 'x' })] }).replace(
+    'href="https://mail.google.com/mail?view=conv"',
+    'href="https://mail.google.com/mail?account_id=1&amp;message_id=abc&amp;view=conv"',
+  );
+  assert.equal(
+    parseInboxFeed(encoded).entries[0].link,
+    'https://mail.google.com/mail?account_id=1&message_id=abc&view=conv',
+  );
+
+  // A link anywhere but Gmail is dropped rather than offered as "Open in Gmail".
+  const elsewhere = feedXml({ entries: [entryXml({ subject: 'x' })] }).replace(
+    'https://mail.google.com/mail?view=conv',
+    'https://phishing.example/open',
+  );
+  assert.equal(parseInboxFeed(elsewhere).entries[0].link, '');
+});
+
+/* ------------------------------------------------------------------ *
+ * The other inbox tabs
+ * ------------------------------------------------------------------ */
+
+test('a tab feed is the plain feed with the label appended', () => {
+  assert.equal(
+    feedUrl(0, '^sq_ig_i_notification'),
+    'https://mail.google.com/mail/u/0/feed/atom/^sq_ig_i_notification',
+  );
+  assert.equal(feedUrl(2, '^sq_ig_i_promo'), 'https://mail.google.com/mail/u/2/feed/atom/^sq_ig_i_promo');
+  assert.equal(feedUrl(1, ''), 'https://mail.google.com/mail/u/1/feed/atom');
+  // Primary is what the plain feed already returned, so it is not in the list;
+  // and every label has a name the popup can print.
+  assert.ok(!CATEGORY_LABELS.some((label) => /personal/.test(label)));
+  for (const label of CATEGORY_LABELS) assert.ok(CATEGORY_NAMES[label], `${label} has no on-screen name`);
+});
+
+test('the other tabs are read after Primary, and a tab that is not there is not an error', async () => {
+  const now = Date.parse('2026-07-29T12:00:00Z');
+  const asked = [];
+  const entries = await fetchCategoryEntries({
+    windowMinutes: 10,
+    now,
+    fetchImpl: async (url) => {
+      asked.push(String(url));
+      const label = String(url).split('/feed/atom/')[1] ?? '';
+      // Updates has the code; Promotions does not exist on this account;
+      // Social answers with a login page; Forums answers 401.
+      if (label === '^sq_ig_i_notification') {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => feedXml({ entries: [entryXml({ subject: 'Your code 313131', id: 'tag:updates' })] }),
+        };
+      }
+      if (label === '^sq_ig_i_promo') return { ok: false, status: 404 };
+      if (label === '^sq_ig_i_social') {
+        return { ok: true, status: 200, text: async () => '<!DOCTYPE html><html><body>Sign in</body></html>' };
+      }
+      return { ok: false, status: 401 };
+    },
+  });
+  assert.deepEqual(entries.map((entry) => entry.id), ['tag:updates']);
+  assert.deepEqual(asked, CATEGORY_LABELS.map((label) => feedUrl(0, label)));
+});
+
+test('a message filed under two tabs is one candidate', async () => {
+  const now = Date.parse('2026-07-29T12:00:00Z');
+  const same = feedXml({ entries: [entryXml({ subject: 'Your code 424242', id: 'tag:same' })] });
+  const entries = await fetchCategoryEntries({
+    windowMinutes: 10,
+    now,
+    fetchImpl: async () => ({ ok: true, status: 200, text: async () => same }),
+  });
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].account, 'me@example.com');
+});
+
+test('every tab failing is an empty answer, never an error', async () => {
+  const entries = await fetchCategoryEntries({
+    accounts: [{ index: 0 }, { index: 1 }],
+    windowMinutes: 10,
+    fetchImpl: async () => ({ ok: false, status: 404 }),
+  });
+  assert.deepEqual(entries, []);
+
+  const offline = await fetchCategoryEntries({
+    windowMinutes: 10,
+    fetchImpl: async () => {
+      throw new TypeError('Failed to fetch');
+    },
+  });
+  assert.deepEqual(offline, []);
 });
 
 test('a real-shaped feed yields the code, end to end', async () => {

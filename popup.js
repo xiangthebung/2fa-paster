@@ -5,10 +5,18 @@
  * renders it. The one thing it does for itself is copying, because a popup is
  * focused and allowed to use the async clipboard API directly, which is a shorter
  * route than asking the worker to spin up an offscreen document.
+ *
+ * The centre of it is the decision card. It used to be a status line — "Filled it
+ * in and submitted the form" — which said that something happened and nothing
+ * about whether it was the right thing. The card says whose mail the code came
+ * from, by address, and whether that is the site in front of you; what was
+ * filled; which button was pressed; which fields were skipped and why; and, when
+ * the sender could not be tied to the page, that the submit was held for you.
  */
 
 import { SITE_ORIGINS } from './settings.js';
-import { senderName } from './domains.js';
+import { senderAddress, senderName } from './domains.js';
+import { CATEGORY_LABELS, CATEGORY_NAMES } from './inbox-feed.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -20,22 +28,36 @@ const els = {
   noticeBody: $('notice-body'),
   noticeAction: $('notice-action'),
   noticeAlt: $('notice-alt'),
-  upgradeHint: $('upgrade-hint'),
-  upgradeButton: $('upgrade-button'),
   ready: $('ready'),
   targetSite: $('target-site'),
   targetField: $('target-field'),
   pasteButton: $('paste-button'),
   pasteLabel: $('paste-label'),
+  guideCard: $('guide-card'),
+  guideShortcut: $('guide-shortcut'),
+  guideKey: $('guide-key'),
+  guideAuto: $('guide-auto'),
+  guideDismiss: $('guide-dismiss'),
   codeCard: $('code-card'),
   codeValue: $('code-value'),
   codeSource: $('code-source'),
+  codeAddress: $('code-address'),
+  openMail: $('open-mail'),
   codeOrigin: $('code-origin'),
+  codeOutcome: $('code-outcome'),
+  heldActions: $('held-actions'),
+  submitAnyway: $('submit-anyway'),
+  heldAlternatives: $('held-alternatives'),
   codeWhy: $('code-why'),
   codeConfidence: $('code-confidence'),
   codeReasons: $('code-reasons'),
   copyButton: $('copy-button'),
   fillButton: $('fill-button'),
+  emptyCard: $('empty-card'),
+  emptyBody: $('empty-body'),
+  openSearch: $('open-search'),
+  retryButton: $('retry-button'),
+  upgradeButton: $('upgrade-button'),
   status: $('status'),
   historyCard: $('history-card'),
   historyCount: $('history-count'),
@@ -50,10 +72,31 @@ const els = {
   shortcutHint: $('shortcut-hint'),
 };
 
+/** The same sentence the worker uses for a page extensions cannot touch. */
+const UNFILLABLE_PAGE = 'Chrome does not allow filling on this page';
+
 /** Latest status from the worker, so click handlers know the current tab. */
 let state = null;
 /** Kept so the age line can tick without another round trip. */
 let shownCode = null;
+/** The bound shortcut, for the button and the one-time tip. */
+let shortcut = '';
+/**
+ * True after a search that found nothing, until the next one.
+ *
+ * The empty card takes the code card's place while it is up: "Nothing found"
+ * above a large code from ten minutes ago reads as a contradiction, and the old
+ * code is still one click away in the recent list.
+ */
+let emptyShown = false;
+/**
+ * A code this popup put on the clipboard itself.
+ *
+ * The worker only knows about the copies it made, and the decision card is
+ * rendered from the worker's record, so a copy made here would otherwise vanish
+ * from the card on the next poll.
+ */
+let copiedHere = '';
 
 /**
  * Re-read the status this often while the popup is open.
@@ -109,40 +152,159 @@ function coarseAge(timestamp) {
   return minutes === 1 ? '1 min ago' : `${minutes} min ago`;
 }
 
+/** The tab's site, or the one the code was found for. */
+const siteFor = (code) => code?.site || state?.tab?.site || '';
+
+/* ------------------------------------------------------------------ *
+ * The decision card
+ * ------------------------------------------------------------------ */
+
 /**
- * Say whether this code belongs to the page, but only when that is worth saying.
+ * Where the sender stands with the page.
  *
- * A confirmed match is reassurance: with several services mailing codes, knowing
- * this one came from the site in front of you is the difference between pasting
- * and checking first. `ambiguous` is the opposite — several codes arrived and
- * nothing tied any of them here, so the pick is a guess and should read like one.
- * Everything in between is silent, which is the common case.
+ * Three answers. A confirmed match is reassurance: with several services mailing
+ * codes, knowing this one came from the site in front of you is the difference
+ * between pasting and checking first. Ambiguous is the opposite — several codes
+ * arrived and nothing tied any of them here — and when the code went in, that is
+ * the held state: filled, not submitted, waiting for a person. In between, the
+ * sender simply is not tied to the page, which is said quietly.
  */
 function renderOrigin(code) {
-  const site = state?.tab?.site ?? '';
+  const site = siteFor(code);
+  const pill = els.codeOrigin;
+
+  const say = (tone, title, note = '') => {
+    pill.hidden = false;
+    pill.className = `code-origin is-${tone}`;
+    const strong = document.createElement('strong');
+    strong.textContent = title;
+    pill.replaceChildren(strong);
+    if (note) {
+      const span = document.createElement('span');
+      span.textContent = note;
+      pill.append(span);
+    }
+  };
 
   if (code.siteMatch) {
-    els.codeOrigin.hidden = false;
-    els.codeOrigin.className = 'code-origin is-match';
-    els.codeOrigin.textContent = code.senderSite
-      ? `Sent by ${code.senderSite} — the site you are on`
-      : 'This mail came from the site you are on';
+    say('match', code.senderSite ? `Sent by ${code.senderSite} — the site you are on` : 'This mail came from the site you are on');
     return;
   }
   if (code.ambiguous) {
-    els.codeOrigin.hidden = false;
-    els.codeOrigin.className = 'code-origin is-unsure';
-    els.codeOrigin.textContent = site
-      ? `Several codes just arrived and none name ${site}. Check this one first.`
-      : 'Several codes just arrived. Check this one before using it.';
+    const heldInPage = Boolean(code.outcome?.filled && !code.outcome?.submitted);
+    say(
+      'unsure',
+      heldInPage ? 'Held — check the sender' : 'Check the sender first',
+      site
+        ? `Several codes just arrived and none name ${site}.`
+        : 'Several codes just arrived and nothing ties this one to this page.',
+    );
     return;
   }
-  els.codeOrigin.hidden = true;
+  if (site && code.senderSite && !code.outcome?.swapped) {
+    say('neutral', `Not tied to ${site} by its sender`);
+    return;
+  }
+  pill.hidden = true;
+}
+
+/**
+ * What was done, one line each.
+ *
+ * Rendered from the record the worker keeps, not from the reply to a click, so a
+ * popup opened after an automatic fill — the one nobody was watching — still
+ * says what was filled, what was pressed and what was skipped.
+ */
+function renderOutcome(code) {
+  const outcome = code.outcome;
+  const list = els.codeOutcome;
+  if (!outcome) {
+    list.hidden = true;
+    list.replaceChildren();
+    return;
+  }
+
+  const rows = [];
+  const row = (tone, text) => rows.push({ tone, text });
+
+  if (outcome.filled) {
+    if (outcome.kind === 'segmented') row('ok', `Filled ${outcome.boxes} boxes`);
+    else row('ok', outcome.label ? `Filled “${outcome.label}”` : 'Filled the code box');
+
+    if (outcome.submitted) {
+      if (outcome.pressed) row('ok', `Pressed ${outcome.pressed}`);
+      else if (outcome.submitKind === 'enter') row('ok', 'Pressed Enter');
+      else row('ok', 'Submitted the form');
+    } else if (outcome.held) {
+      row('hold', 'Not submitted — check the sender first');
+    } else if (outcome.submitWanted) {
+      row('skip', 'Not submitted — the form had nothing to press');
+    }
+  } else if (outcome.fillReason === 'blocked') {
+    row('bad', UNFILLABLE_PAGE);
+  } else if (outcome.fillReason === 'no-field') {
+    row('bad', 'No code box found on this page');
+  } else if (outcome.fillReason === 'rejected') {
+    row('bad', 'The page would not accept a typed value');
+  } else if (outcome.fillReason === 'no-tab') {
+    row('bad', 'No page here to fill');
+  }
+
+  for (const refusal of outcome.refused ?? []) {
+    row('skip', `Skipped “${refusal.label}” — ${refusal.rule}`);
+  }
+  if (outcome.copied || copiedHere === code.code) row('ok', 'Copied to your clipboard');
+
+  list.hidden = rows.length === 0;
+  list.replaceChildren(
+    ...rows.map(({ tone, text }) => {
+      const item = document.createElement('li');
+      item.className = `is-${tone}`;
+      item.textContent = text;
+      return item;
+    }),
+  );
+}
+
+/**
+ * The held state's two ways out: press the button after all, or put a different
+ * code in. Both one click, and both the same click the page's own card offers.
+ */
+function renderHeld(code) {
+  const held = Boolean(code.held && code.outcome?.filled && !code.outcome?.submitted);
+  els.heldActions.hidden = !held;
+  if (!held) return;
+
+  els.submitAnyway.hidden = !code.outcome.submitWanted;
+
+  const rows = (state?.history ?? []).filter((entry) => entry.code !== code.code).slice(0, 2);
+  els.heldAlternatives.replaceChildren(
+    ...rows.map((entry) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'alt-button';
+      button.dataset.code = entry.code;
+
+      const strong = document.createElement('strong');
+      strong.append('Use ');
+      const value = document.createElement('b');
+      value.textContent = entry.code;
+      strong.append(value, ' instead');
+
+      const small = document.createElement('small');
+      small.textContent = [senderAddress(entry.from) || senderName(entry.from), coarseAge(entry.receivedAt)]
+        .filter(Boolean)
+        .join(' · ');
+
+      button.append(strong, small);
+      return button;
+    }),
+  );
 }
 
 function renderCode(code) {
   shownCode = code;
-  if (!code) {
+  if (!code || emptyShown) {
     els.codeCard.hidden = true;
     return;
   }
@@ -158,7 +320,19 @@ function renderCode(code) {
     }),
   );
   els.codeWhy.hidden = (code.reasons ?? []).length === 0;
+
+  // The address, not only the display name: a spoofed name is indistinguishable
+  // from a real one, and the address is what a person checks. With two mailboxes
+  // signed in, also which of them the code landed in.
+  const address = code.address || senderAddress(code.from);
+  const several = (state?.accounts?.length ?? 0) > 1 && code.account;
+  els.codeAddress.textContent = several ? `${address || 'unknown address'} → ${code.account}` : address;
+  els.codeAddress.hidden = !address && !several;
+  els.openMail.hidden = !code.link;
+
   renderOrigin(code);
+  renderOutcome(code);
+  renderHeld(code);
   paintAges();
 }
 
@@ -177,6 +351,44 @@ function paintAges() {
     els.watchText.textContent = `Watching your inbox — ${secondsLeft}s left`;
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Nothing found
+ * ------------------------------------------------------------------ */
+
+/**
+ * What the search read, said plainly, and the two ordinary reasons a code is not
+ * in it: it was opened on the phone, or Gmail filed it under another tab. The
+ * second is now checked automatically; the first has a button.
+ */
+function renderEmpty() {
+  els.emptyCard.hidden = !emptyShown;
+  if (!emptyShown) return;
+  const minutes = state?.settings?.freshnessMinutes ?? 10;
+  const feed = state?.source === 'feed';
+  els.emptyBody.textContent = feed
+    ? `No one-time code in unread mail from the last ${minutes} minutes. This reads unread Primary mail, ` +
+      `and checked the ${inboxTabs()} tabs too.`
+    : `No one-time code in mail from the last ${minutes} minutes that matched the code search.`;
+  els.upgradeButton.hidden = !feed;
+}
+
+/** "Updates, Promotions, Social and Forums" — named from the list the reader actually probes. */
+function inboxTabs() {
+  const names = CATEGORY_LABELS.map((label) => CATEGORY_NAMES[label]).filter(Boolean);
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names.join('');
+}
+
+/** A Gmail search for the mail this could not see: recent, and worded like a code. */
+function gmailSearchUrl() {
+  const index = state?.accounts?.[0]?.index ?? 0;
+  const query = 'newer_than:1d (code OR verification OR passcode OR OTP OR "one-time")';
+  return `https://mail.google.com/mail/u/${index}/#search/${encodeURIComponent(query)}`;
+}
+
+/* ------------------------------------------------------------------ *
+ * Recent codes
+ * ------------------------------------------------------------------ */
 
 /**
  * Codes seen in the last few minutes, and who each was for.
@@ -219,7 +431,7 @@ function renderHistory(entries) {
       button.type = 'button';
       button.className = 'history-row';
       button.dataset.code = entry.code;
-      button.title = entry.subject || `Code from ${senderName(entry.from)}`;
+      button.title = [senderAddress(entry.from), entry.subject].filter(Boolean).join(' — ') || `Code from ${senderName(entry.from)}`;
 
       const code = document.createElement('span');
       code.className = 'history-code';
@@ -247,6 +459,10 @@ function renderHistory(entries) {
     }),
   );
 }
+
+/* ------------------------------------------------------------------ *
+ * The rest of the popup
+ * ------------------------------------------------------------------ */
 
 /**
  * What to say when a code cannot be fetched yet.
@@ -345,20 +561,41 @@ function renderNotice(status) {
   }
 }
 
+/**
+ * The note under the automatic-filling switch.
+ *
+ * The one thing it has to say before the switch is flipped: Chrome will ask for
+ * the permission, and the popup closes to make room for the prompt. Saying it
+ * afterwards is too late — the popup is gone.
+ */
+function autoNote(status) {
+  if (status.settings.autoFill && !status.autoGranted) {
+    return 'Needs permission to run on the sites you visit — click to grant it';
+  }
+  if (!status.settings.autoFill && !status.autoGranted) {
+    return 'Chrome asks once to run on the sites you visit; the popup closes while it asks';
+  }
+  return 'Watches for a code box and fills it as soon as the mail lands';
+}
+
 function render(status) {
   state = status;
   renderNotice(status);
 
   if (!status.ready) {
     els.account.textContent = status.source === 'feed' ? 'No Gmail session' : 'Not connected';
+    els.account.title = '';
+  } else if ((status.accounts?.length ?? 0) > 1) {
+    // Two addresses do not fit on one line, and an ellipsis in the middle of an
+    // address is worse than a count. The addresses are in the tooltip, and the
+    // one a code came from is on the code itself.
+    els.account.textContent = `${status.accounts.length} accounts`;
+    els.account.title = status.accounts.map((account) => account.account).join(', ');
   } else {
     els.account.textContent = status.email || 'Reading your inbox';
+    els.account.title = status.email || '';
   }
   els.account.classList.toggle('is-connected', Boolean(status.ready && status.email));
-
-  // The upgrade only helps the feed's blind spot, so it is not offered otherwise,
-  // and only after a search has actually come up empty.
-  if (status.source !== 'feed') els.upgradeHint.hidden = true;
 
   els.targetSite.textContent = status.tab?.site || status.tab?.title || 'This page';
 
@@ -369,12 +606,7 @@ function render(status) {
     els.autoSubmit.checked = status.settings.autoSubmit;
   }
 
-  // The one thing worth saying about this row that the switch cannot: it is on,
-  // but it cannot do anything until the permission is granted.
-  els.autoNote.textContent =
-    status.settings.autoFill && !status.autoGranted
-      ? 'Needs permission to run on the sites you visit — click to grant it'
-      : 'Watches for a code box and fills it as soon as the mail lands';
+  els.autoNote.textContent = autoNote(status);
 
   // Not while it is mid-fill: `busy` has borrowed the caption and will put back
   // whatever it finds here when it is done.
@@ -384,6 +616,10 @@ function render(status) {
 
   els.watchBanner.hidden = !status.watching;
 
+  els.guideCard.hidden = !status.guide;
+  els.guideAuto.hidden = status.settings.autoFill;
+
+  renderEmpty();
   renderCode(status.lastCode);
   renderHistory(status.history);
   paintAges();
@@ -430,39 +666,6 @@ function explain(error) {
   return error?.message ?? 'Something went wrong.';
 }
 
-function describeOutcome(result) {
-  if (result.filled) {
-    const done = result.submitted ? 'Filled it in and submitted the form' : 'Filled it in';
-    return [`${done}.${result.copied ? ' Copied it too.' : ''}`, 'good'];
-  }
-  // Each of these has to check `copied` rather than assume it. "Also copy to the
-  // clipboard" is a setting, and telling someone the code is on their clipboard
-  // when it is not sends them to paste nothing into a form that is waiting.
-  if (result.fillReason === 'blocked') {
-    return [
-      result.copied
-        ? 'Copied it. Chrome does not allow filling on this page.'
-        : 'Chrome does not allow filling on this page. The code is above — copy it.',
-      'warn',
-    ];
-  }
-  if (result.fillReason === 'no-field') {
-    return [
-      result.copied ? 'Copied it — no code box found here, so paste it yourself.' : 'No code box found on this page.',
-      'warn',
-    ];
-  }
-  if (result.fillReason === 'rejected') {
-    return [
-      result.copied
-        ? 'Copied it. The page would not accept a typed value, so paste it instead.'
-        : 'The page would not accept a typed value. The code is above — copy it.',
-      'warn',
-    ];
-  }
-  return [result.copied ? 'Copied it to your clipboard.' : 'Found a code.', 'good'];
-}
-
 async function refreshStatus() {
   const response = await send('status');
   if (response.ok) render(response.status);
@@ -483,21 +686,50 @@ async function saveSetting(patch) {
   }
 }
 
-/** Ask the page whether it has somewhere to put a code. */
+/**
+ * Ask the page whether it has somewhere to put a code.
+ *
+ * Three answers, each said differently: a box was found; Chrome will not let an
+ * extension into this page at all; or no box, and the fields that were looked at
+ * and passed over — "skipped 'Security code' (card field)" — which is the safety
+ * story told before anything has been pressed.
+ */
 async function checkField() {
   if (!state?.tab?.id) return;
   try {
-    const response = await send('has-field', { tabId: state.tab.id });
-    els.targetField.textContent = response.hasField ? 'Code box found — ready to fill' : 'No code box found here';
+    const response = await send('has-field', { tabId: state.tab.id, url: state.tab.url ?? '' });
+    const refused = response.refused ?? [];
+    let text;
+    if (response.hasField) text = 'Code box found — ready to fill';
+    else if (response.blocked) text = response.reason || UNFILLABLE_PAGE;
+    else if (refused.length > 0) text = `No code box — skipped “${refused[0].label}” (${refused[0].rule})`;
+    else text = 'No code box found here';
+    els.targetField.textContent = text;
+    els.targetField.title = refused.map((entry) => `Skipped “${entry.label}” — ${entry.rule}`).join('\n');
     els.targetField.classList.toggle('is-found', Boolean(response.hasField));
+    els.targetField.classList.toggle('is-blocked', Boolean(response.blocked));
   } catch {
     els.targetField.textContent = 'Cannot read this page';
   }
 }
 
-els.pasteButton.addEventListener('click', () =>
-  busy(
-    els.pasteButton,
+/** Show a fill's result, then re-read the worker's record so the card reflects what it kept. */
+async function showResult(result) {
+  emptyShown = false;
+  renderEmpty();
+  renderCode(result);
+  await refreshStatus();
+}
+
+/**
+ * Fetch and fill — the main button, and "Try again" on the empty card.
+ *
+ * @param {HTMLButtonElement} button    the one that was pressed, so it shows the work
+ * @param {HTMLElement} [labelEl]
+ */
+function fetchCode(button, labelEl = button) {
+  return busy(
+    button,
     'Looking in Gmail…',
     async () => {
       setStatus('');
@@ -511,24 +743,22 @@ els.pasteButton.addEventListener('click', () =>
           return;
         }
         if (!response.found) {
-          setStatus('Nothing in the last few minutes looks like a one-time code.', 'warn');
-          // Now is the moment the upgrade is worth mentioning: the feed was read
-          // successfully and the code was not in it.
-          els.upgradeHint.hidden = state?.source !== 'feed';
+          emptyShown = true;
+          renderEmpty();
+          renderCode(state?.lastCode ?? null);
           return;
         }
-        els.upgradeHint.hidden = true;
-        renderCode(response.result);
-        const [text, tone] = describeOutcome(response.result);
-        setStatus(text, tone);
-        await refreshStatus();
+        await showResult(response.result);
       } catch (error) {
         setStatus(error.message, 'error');
       }
     },
-    els.pasteLabel,
-  ),
-);
+    labelEl,
+  );
+}
+
+els.pasteButton.addEventListener('click', () => fetchCode(els.pasteButton, els.pasteLabel));
+els.retryButton.addEventListener('click', () => fetchCode(els.retryButton));
 
 /**
  * Put a code on the clipboard.
@@ -549,8 +779,11 @@ async function copy(text) {
   } catch {
     // No clipboard access from here; the worker's offscreen document arms its own
     // timer, so this path needs nothing further.
-    return Boolean((await send('copy', { text })).ok);
+    const ok = Boolean((await send('copy', { text })).ok);
+    if (ok) copiedHere = text;
+    return ok;
   }
+  copiedHere = text;
   try {
     await send('clipboard-written');
   } catch {
@@ -563,6 +796,7 @@ async function copy(text) {
 async function copyShownCode() {
   if (!shownCode) return;
   const ok = await copy(shownCode.code);
+  if (ok) renderOutcome(shownCode);
   setStatus(ok ? 'Copied to your clipboard.' : 'Could not reach the clipboard.', ok ? 'good' : 'error');
 }
 
@@ -573,50 +807,91 @@ els.codeValue.addEventListener('click', copyShownCode);
 els.fillButton.addEventListener('click', () =>
   busy(els.fillButton, 'Filling…', async () => {
     if (!state?.tab?.id) return;
-    const response = await send('refill', { tabId: state.tab.id });
+    setStatus('');
+    try {
+      const response = await send('refill', { tabId: state.tab.id, url: state.tab.url ?? '' });
+      if (!response.ok) {
+        setStatus(explain(response.error), 'error');
+        return;
+      }
+      if (!response.found) {
+        setStatus('No code in hand. Fetch one first.', 'warn');
+        return;
+      }
+      await showResult(response.result);
+    } catch (error) {
+      setStatus(error.message, 'error');
+    }
+  }),
+);
+
+/**
+ * Press the button for a code that was held.
+ *
+ * The person has looked at the sender and decided. If the page has moved on since
+ * the fill — the form re-rendered, the tab navigated — there is nothing to press,
+ * and the card says so rather than pretending.
+ */
+els.submitAnyway.addEventListener('click', () =>
+  busy(els.submitAnyway, 'Submitting…', async () => {
+    setStatus('');
+    try {
+      const response = await send('submit', { tabId: state?.tab?.id ?? null });
+      if (!response.ok) {
+        setStatus(explain(response.error), 'error');
+        return;
+      }
+      if (!response.found) {
+        setStatus('No code in hand. Fetch one first.', 'warn');
+        return;
+      }
+      if (!response.result.outcome?.submitted) {
+        setStatus('Nothing to submit — the page may have moved on. Fill it again first.', 'warn');
+      }
+      await showResult(response.result);
+    } catch (error) {
+      setStatus(error.message, 'error');
+    }
+  }),
+);
+
+/**
+ * Picking a code is how you correct a wrong guess, so it does the whole job:
+ * clipboard and page, without another trip to Gmail. Shared by the recent list
+ * and the held card's "Use … instead" buttons.
+ */
+async function useCode(code) {
+  setStatus('');
+  const copied = await copy(code);
+  if (!state?.tab?.id) {
+    setStatus(copied ? 'Copied it. There is no page here to fill.' : 'There is no page here to fill.', 'warn');
+    return;
+  }
+
+  try {
+    const response = await send('refill', { tabId: state.tab.id, url: state.tab.url ?? '', code });
     if (!response.ok) {
       setStatus(explain(response.error), 'error');
       return;
     }
     if (!response.found) {
-      setStatus('No code in hand. Fetch one first.', 'warn');
+      setStatus('That code is no longer in hand.', 'warn');
       return;
     }
-    const [text, tone] = describeOutcome(response.result);
-    setStatus(text, tone);
-  }),
-);
-
-/**
- * Picking a row is how you correct a wrong guess, so it does the whole job:
- * clipboard and page, without another trip to Gmail.
- */
-els.historyList.addEventListener('click', async (event) => {
-  const row = event.target.closest('.history-row');
-  if (!row) return;
-  const code = row.dataset.code;
-  if (!code) return;
-
-  const copied = await copy(code);
-  if (!state?.tab?.id) {
-    setStatus(
-      copied ? 'Copied it. There is no page here to fill.' : 'There is no page here to fill.',
-      'warn',
-    );
-    return;
-  }
-
-  try {
-    const response = await send('refill', { tabId: state.tab.id, code });
-    if (!response.ok) {
-      setStatus(explain(response.error), 'error');
-      return;
-    }
-    const [text, tone] = describeOutcome({ ...response.result, copied });
-    setStatus(text, tone);
+    await showResult(response.result);
   } catch (error) {
     setStatus(error.message, 'error');
   }
+}
+
+els.historyList.addEventListener('click', (event) => {
+  const row = event.target.closest('.history-row');
+  if (row?.dataset.code) useCode(row.dataset.code);
+});
+
+els.heldAlternatives.addEventListener('click', (event) => {
+  const button = event.target.closest('.alt-button');
+  if (button?.dataset.code) useCode(button.dataset.code);
 });
 
 els.historyClear.addEventListener('click', async () => {
@@ -625,7 +900,24 @@ els.historyClear.addEventListener('click', async () => {
   setStatus('Recent codes cleared.');
 });
 
+els.openMail.addEventListener('click', () => {
+  if (shownCode?.link) chrome.tabs.create({ url: shownCode.link });
+});
+
+els.openSearch.addEventListener('click', () => {
+  chrome.tabs.create({ url: gmailSearchUrl() });
+});
+
 els.upgradeButton.addEventListener('click', () => chrome.runtime.openOptionsPage());
+
+els.guideDismiss.addEventListener('click', async () => {
+  els.guideCard.hidden = true;
+  try {
+    await send('dismiss-guide');
+  } catch {
+    // It will come back next time; that is the worst case.
+  }
+});
 
 // No status message: the switch is the confirmation, and a line of text appearing
 // underneath it only moves the thing that was just clicked.
@@ -638,9 +930,10 @@ els.autoFill.addEventListener('change', async () => {
   const wanted = els.autoFill.checked;
   setStatus('');
 
-  // Write the preference before asking for the permission. Chrome may close this
-  // popup to show the prompt, and this way the grant is still matched by a
-  // setting when the worker reconciles them afterwards.
+  // Write the preference before asking for the permission. Chrome closes this
+  // popup to show the prompt — the note under the switch says so beforehand —
+  // and this way the grant is still matched by a setting when the worker
+  // reconciles them afterwards.
   await saveSetting({ autoFill: wanted });
 
   if (!wanted) {
@@ -691,12 +984,14 @@ els.settingsButton.addEventListener('click', () => chrome.runtime.openOptionsPag
 async function showShortcut() {
   try {
     const commands = await chrome.commands.getAll();
-    const shortcut = commands.find((command) => command.name === 'paste-code')?.shortcut;
-    els.shortcutHint.textContent = shortcut ?? '';
-    els.shortcutHint.hidden = !shortcut;
+    shortcut = commands.find((command) => command.name === 'paste-code')?.shortcut ?? '';
   } catch {
-    els.shortcutHint.hidden = true;
+    shortcut = '';
   }
+  els.shortcutHint.textContent = shortcut;
+  els.shortcutHint.hidden = !shortcut;
+  els.guideKey.textContent = shortcut;
+  els.guideShortcut.hidden = !shortcut;
 }
 
 /**

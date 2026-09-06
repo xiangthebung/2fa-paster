@@ -15,8 +15,12 @@ Two ways to use it:
   watches your inbox for a couple of minutes and the code lands in the box on its
   own, a second or two after the mail arrives.
 
-Either way it says so on the page afterwards, and with several services mailing codes
-at once it works out which one belongs to the site you are actually on.
+Either way it says so afterwards — on the page, and in the popup as a decision card:
+whose mail the code came from, by address, and whether that is the site you are on;
+what it filled; which button it pressed; which fields it skipped and why. With several
+services mailing codes at once it works out which one belongs to the site you are
+actually on, and when nothing ties any of them to it, the code goes in but is never
+submitted for you.
 
 ## Install
 
@@ -53,6 +57,14 @@ For one-time codes it is a good fit, in ways that are not obvious:
 - It carries far less text than a full message, so there are fewer decoy numbers
   to score against.
 
+With Gmail's tabbed inbox the plain feed is the Primary tab, and Gmail files a good
+deal of transactional mail under Updates or Promotions instead — unread, in the
+inbox, and invisible to the plain feed. So when Primary has nothing, each tab's own
+feed is asked: `feed/atom/^sq_ig_i_notification`, `^sq_ig_i_promo`,
+`^sq_ig_i_social` and `^sq_ig_i_group`. A tab that is not there answers 404, a
+classic inbox answers with nothing, and either counts as empty rather than as an
+error. While automatic filling is watching, the tabs are checked on every third poll.
+
 Two honest limitations:
 
 - **The snippet is not the body.** If a code sits further into the message than the
@@ -72,7 +84,8 @@ is a Google Cloud OAuth client of your own — free and usually 5–10 minutes t
 up.
 
 Switch between the two on the options page. The popup also offers the upgrade at
-the moment it is actually relevant: after a search comes up empty.
+the moment it is actually relevant — at the end of the "Nothing found" card, after
+the two commoner reasons for an empty search have been dealt with.
 
 ---
 
@@ -159,18 +172,40 @@ manifest as `key`, fixing the ID.
 
 ## Using it
 
-**The popup.** Shows whether the current page has a code box, fetches the newest
-code, and displays it large enough to read at a glance — click it to copy. When the
-mail demonstrably came from the site you are on, it says so; when several codes
-arrived and none of them did, it says that instead. *Why this one* lists the signals
-that picked it, which is worth a look the first few times and when a message is
-unusual. Below that, a collapsed list of the codes that arrived recently and who each
-was from.
+**The popup.** Shows whether the current page has a code box — and, when it does not,
+which fields it looked at and passed over ("skipped 'Security code' (card field)").
+**Get my code** fetches the newest code and displays it large enough to read at a
+glance — click it to copy — with a decision card underneath: the sender's address,
+**Open in Gmail** beside it; whether that mail came from the site you are on; then one
+line per thing that was done — "Filled 'Verification code'", "Pressed Verify",
+"Skipped 'Security code' — card field", "Copied to your clipboard". *Why this one*
+lists the signals that picked it, which is worth a look the first few times and when a
+message is unusual. Below that, a collapsed list of the codes that arrived recently and
+who each was from. With two Gmail accounts signed in, the header reads "2 accounts" —
+the addresses are in its tooltip — and the code says which mailbox it landed in.
+
+When nothing turns up, the card says what was read — unread Primary mail from the last
+ten minutes, and the Updates, Promotions, Social and Forums tabs too — and names the
+ordinary reason a code is missing: you opened it on your phone, and read mail is
+invisible to the feed. **Open Gmail search** opens a search for recent code mail; mark
+the message unread and press **Try again**. The full-message reader is offered last,
+because it fixes the rarer case.
+
+After the first code goes into a page, a one-time card names the keyboard shortcut and
+explains automatic filling — including that Chrome will ask for a permission and close
+the popup to do so. **Got it** closes it for good.
 
 **The keyboard shortcut.** `Ctrl+Shift+2` by default — `Command+Shift+2` on macOS,
 which Chrome substitutes on its own. Fetch and fill without opening anything, which
 is the fastest way to use this, so the popup prints the shortcut on the button that
 does the same job rather than hiding it in a footnote.
+
+Press it again on the page that was just filled and, instead of typing the same code
+in twice, the card in the corner comes back with the other recent codes — anything
+newer in the inbox first, then the recent list — each one click from taking the box
+over. A held code comes back held, with **Submit anyway** still on offer. This lasts
+as long as the boxes it filled are still on the page and the code is still fresh;
+after that a press is an ordinary fetch again.
 
 `Ctrl+Shift+<digit>` is the conventional range for extension shortcuts, and Chrome
 requires every combination to include `Ctrl` or `Alt` — a bare key is not available
@@ -190,9 +225,12 @@ has already delivered, and requires a confidence score of 55 or better. A number
 that merely sits near the word "code" will not be typed into a page unasked; the
 popup holds it instead.
 
-It also declines to guess between services. If several codes have arrived and none
-of them can be tied to the site in front of you, nothing is typed in — the popup
-holds the best candidate and says why it is unsure. See
+It does not guess between services either, and here the two paths agree. If several
+codes have arrived and none of them can be tied to the site in front of you, the best
+candidate is typed in — seeing it in the box is how you judge it — but never
+submitted, whichever path put it there. The card on the page and the popup both read
+"Held — check the sender", name the address, and offer **Submit anyway** and "Use
+771204 instead" for each of the others, so finishing is one click either way. See
 [which code is yours](#which-code-is-yours).
 
 **The toolbar badge.** The only status there is when the popup is closed, which is
@@ -203,12 +241,13 @@ most of the time and all of the time during an automatic fill:
 | `…` | Watching your inbox for a code |
 | `✓` | A code was filled into the page |
 | `•` | A code was found but could not be filled — open the popup |
-| `?` | A code arrived that is not certain enough to type in unasked; the popup has it |
+| `?` | A code went in but was held — several arrived and none named this site — or one arrived that is not certain enough to type in unasked; the popup has it either way |
 | `!` | The read failed — the popup says why |
 | `–` | Nothing recent in Gmail looks like a code |
 
-`✓`, `•`, `!` and `–` clear themselves on a timer. `…` and `?` stay until the watch
-ends, because both mean there is still something to come back to.
+`✓`, `•`, `!`, `–` and a held code's `?` clear themselves on a timer. `…`, and the `?`
+of a code the watch is holding back, stay until the watch ends, because both mean
+there is still something to come back to.
 
 ### Settings worth knowing about
 
@@ -249,20 +288,27 @@ anybody makes — it is a step. So the extension takes it, and the care goes int
 - If no button qualifies, the form is asked to submit itself. If there is no form
   at all — a modal handling the key itself — Enter is pressed, which is what a
   person would do.
+- Never while the sender is in doubt. With several codes in the inbox and nothing
+  tying this one to the site, the code is filled and the button is left alone;
+  **Submit anyway** is on the card and in the popup.
 
 Each of those is covered by `npm run test:browser`, against fixture pages built
 around the cases that matter: a checkout form whose CVV box is labelled "Security
-code", a form offering both "Resend confirmation code" and "Verify", and one whose
-only buttons are destructive.
+code", a payment step with a card number, that CVV and the code box side by side, a
+form offering both "Resend confirmation code" and "Verify", and one whose only
+buttons are destructive.
 
-A small card appears in the corner of the page afterwards saying what happened. It
-matters most here: with submitting automatic, the form can be gone before you have
-worked out why.
+A small card appears in the corner of the page afterwards saying what happened —
+which button, by name: "Code filled in, Verify pressed". It matters most here: with
+submitting automatic, the form can be gone before you have worked out why. When other
+codes arrived at the same time the card lists them by address under *Other recent
+codes*, and one click swaps the box to a different one.
 
 ### Recent codes
 
 The popup keeps a collapsed list of what arrived in the last half hour, each row
-naming its sender and, when it was filled, the site it went into. It is there for the
+naming its sender — the address and subject are in its tooltip — and, when it was
+filled, the site it went into. It is there for the
 cases nothing automatic can get right — two services mailing within seconds of each
 other, a code filled into the tab you had open before this one, a page that swallowed
 one without saying so. Clicking a row copies that code and fills it into the current
@@ -295,9 +341,10 @@ background.js              Service worker. Orchestrates everything.
         └── offscreen.js    Clipboard, which a service worker cannot reach.
 ```
 
-Both readers produce a `{ id, from, subject, text, receivedAt }` record and hand it
-to the same scorer, so switching between them changes what can be seen, not how it
-is judged.
+Both readers produce a `{ id, from, subject, text, receivedAt, link }` record — `link`
+being Gmail's own address for the message, which is what "Open in Gmail" opens — and
+hand it to the same scorer, so switching between them changes what can be seen, not
+how it is judged.
 
 Three parts carry the interesting problems.
 
@@ -336,9 +383,10 @@ The interesting part is what is *not* treated as belonging to somebody else. A g
 many services mail through SendGrid or Amazon SES, or from a domain naming the
 channel rather than the company. Those senders prove nothing, so they stay in
 contention with a penalty. And when several codes arrive with nothing tying any of
-them to the page, that is reported as ambiguous rather than resolved: the popup still
-shows its best guess, because you can see it and judge, but the unattended path
-refuses to type it in.
+them to the page, that is reported as ambiguous rather than resolved: the best guess
+is typed in, because seeing it in the box is how you judge it, and the submit is held,
+because pressing the button with the wrong code is what locks an account. Both paths
+do the same.
 
 **`content.js` — which input is the code box.** `autocomplete="one-time-code"`
 settles it when present, and often it is absent. Everything else is inference from
@@ -346,6 +394,9 @@ names, labels and shape, including the row-of-single-character-boxes pattern. Th
 expensive mistake is a false positive, so anything resembling a card number, a
 CVV, a postcode or a password is disqualified outright rather than merely
 outscored — note that "security code" is the CVV label on most checkout pages.
+Every disqualification is also reported, by the field's label and the rule that
+caught it, which is what the popup turns into "Skipped 'Security code' — card
+field": the difference between having looked and having chosen not to.
 Writing the value is its own problem: a React-controlled input discards a plain
 `.value =` assignment, so the write goes through the prototype's setter with the
 events a real keystroke would produce, and every fill is read back afterwards with
@@ -460,6 +511,15 @@ The five-services case has its own tests: five code mails in one inbox, and the
 right one picked for each of the five sites — plus the case where none of them can
 be tied to the page, which has to report itself as a guess rather than resolve.
 
+The inbox tabs have theirs: a feed for Updates that has the code, beside one for
+Promotions that answers 404, one for Social that answers with a login page and one for
+Forums that answers 401 — and the read has to come back with the code and no error.
+The decision card's words are checked too, because they are the point of it: the
+popup is rendered from fixed records and the sentences read back — "Pressed Verify",
+"Skipped 'Security code' — card field", "Held — check the sender" — and the card on
+the page is read through its closed shadow root by a hook the test installs ahead of
+`content.js`. The root stays closed; a check asserts the page itself cannot reach it.
+
 `tests/wiring.test.mjs` checks the seams that only meet at runtime and only
 through strings: element ids against the HTML, message types against the worker's
 handlers, the CSP against the hosts actually called.
@@ -512,5 +572,6 @@ Named here rather than left to look covered:
   tool, none of that applies.
 - **Codes in spam are not read**, deliberately, by either reader.
 - **Some pages cannot be filled.** `chrome://` pages, the Web Store and other
-  extensions' pages are off limits to every extension. The popup says so and shows
-  the code to copy; with "Also copy to the clipboard" left on, it is already there.
+  extensions' pages are off limits to every extension. The popup says so — the same
+  sentence before and after you press the button — and shows the code to copy; with
+  "Also copy to the clipboard" left on, it is already there.
